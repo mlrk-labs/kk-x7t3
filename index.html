@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#F5F4EF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#101315" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="KK">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<title>KK</title>
+<style>
+  :root {
+    --bg: #F5F4EF;
+    --surface: #FFFFFF;
+    --surface-2: #EDEBE3;
+    --ink: #1C2024;
+    --muted: #6E6A63;
+    --line: #E2DFD5;
+    --ich: #0E9A74;
+    --ich-soft: rgba(14,154,116,.12);
+    --mama: #D95878;
+    --mama-soft: rgba(217,88,120,.12);
+    --shadow: 0 10px 30px rgba(28,32,36,.10), 0 2px 6px rgba(28,32,36,.06);
+    --radius: 20px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101315;
+      --surface: #1B2024;
+      --surface-2: #23292E;
+      --ink: #ECEDE9;
+      --muted: #9BA09A;
+      --line: #2B3237;
+      --ich: #2FB98D;
+      --ich-soft: rgba(47,185,141,.16);
+      --mama: #E87693;
+      --mama-soft: rgba(232,118,147,.16);
+      --shadow: 0 10px 30px rgba(0,0,0,.45), 0 2px 6px rgba(0,0,0,.3);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: none;
+  }
+  .rounded { font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif; }
+
+  .app {
+    max-width: 430px;
+    margin: 0 auto;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding: max(12px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
+  }
+
+  header.bar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 2px 14px;
+  }
+  .bar .title { font-weight: 700; font-size: 17px; letter-spacing: .2px; }
+  .bar .spacer { flex: 1; }
+  .backbtn {
+    appearance: none; border: 1px solid var(--line); background: var(--surface);
+    color: var(--ink); border-radius: 12px; padding: 7px 12px; font-size: 14px;
+    font-weight: 600; cursor: pointer;
+  }
+  .backbtn:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--ich); outline-offset: 2px; }
+
+  .screen { display: none; flex: 1; flex-direction: column; }
+  .screen.active { display: flex; }
+
+  h1 { font-size: 28px; margin: 0 0 6px; text-wrap: balance; }
+  .sub { color: var(--muted); font-size: 15px; line-height: 1.5; margin: 0 0 22px; }
+
+  /* ---------- Lock ---------- */
+  .lockwrap { flex: 1; display: flex; flex-direction: column; justify-content: center; text-align: center; gap: 18px; padding-bottom: 15vh; }
+  .lockicon { font-size: 44px; }
+  input.pin {
+    width: 180px; margin: 0 auto; text-align: center;
+    font: 700 28px/1.2 ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+    letter-spacing: 10px;
+    border: 1px solid var(--line); border-radius: 14px; padding: 12px 8px;
+    background: var(--surface); color: var(--ink);
+  }
+  .lockwrap .btn { width: 180px; margin: 0 auto; }
+
+  /* ---------- Home ---------- */
+  .who { display: flex; flex-direction: column; gap: 14px; margin-top: 8px; }
+  .who button {
+    appearance: none; border: 1px solid var(--line); cursor: pointer;
+    background: var(--surface); color: var(--ink);
+    border-radius: var(--radius); padding: 22px 20px;
+    display: flex; align-items: center; gap: 16px; text-align: left;
+    box-shadow: var(--shadow);
+  }
+  .who .avatar {
+    width: 52px; height: 52px; border-radius: 50%; flex: none;
+    display: grid; place-items: center; font-size: 22px; font-weight: 800;
+  }
+  .who .av-m { background: var(--surface-2); color: var(--ink); }
+  .who .av-v { background: var(--ich-soft); color: var(--ich); }
+  .who .name { font-size: 19px; font-weight: 700; }
+  .who .role { color: var(--muted); font-size: 13.5px; margin-top: 2px; }
+
+  .card-panel {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow);
+  }
+  .stack { display: flex; flex-direction: column; gap: 14px; }
+
+  .btn {
+    appearance: none; border: none; cursor: pointer;
+    border-radius: 14px; padding: 14px 18px; font-size: 16px; font-weight: 700;
+    background: var(--ink); color: var(--bg); width: 100%;
+  }
+  .btn.secondary { background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); }
+  .btn.ghost { background: transparent; color: var(--muted); border: none; font-weight: 600; font-size: 14px; padding: 10px; }
+  .btn.danger { background: var(--mama); color: #fff; }
+  .btn:disabled { opacity: .45; cursor: default; }
+
+  .hint { font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+  .filelabel {
+    display: block; border: 2px dashed var(--line); border-radius: 16px;
+    padding: 26px 16px; text-align: center; cursor: pointer; color: var(--muted);
+    font-size: 15px; background: var(--surface);
+  }
+  .filelabel strong { color: var(--ink); display: block; font-size: 16px; margin-bottom: 4px; }
+  input[type="file"] { display: none; }
+
+  .holder-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .holder-chip {
+    appearance: none; cursor: pointer;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+    border-radius: 999px; padding: 9px 14px; font-size: 14px; font-weight: 600;
+  }
+  .holder-chip.sel { background: var(--ich-soft); border-color: var(--ich); color: var(--ich); }
+  .holder-label { font-size: 13px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+
+  textarea.code {
+    width: 100%; min-height: 110px; resize: vertical;
+    border: 1px solid var(--line); border-radius: 14px; padding: 12px;
+    font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: var(--surface); color: var(--ink); word-break: break-all;
+  }
+
+  .kv { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; padding: 6px 0; }
+  .kv .v { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(12px);
+    background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 999px;
+    font-size: 14px; font-weight: 600; opacity: 0; pointer-events: none;
+    transition: opacity .25s, transform .25s; z-index: 50; max-width: 90vw; text-align: center;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ---------- Swipe ---------- */
+  .swipe-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    border-radius: 999px; padding: 6px 12px; font-size: 13.5px; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .chip.ich { background: var(--ich-soft); color: var(--ich); }
+  .chip.mama { background: var(--mama-soft); color: var(--mama); }
+  .counter { margin-left: auto; color: var(--muted); font-size: 13.5px; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+  .progress { height: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; margin-bottom: 18px; }
+  .progress i { display: block; height: 100%; background: var(--ich); border-radius: 2px; transition: width .3s; }
+
+  .deck {
+    position: relative; flex: 1; min-height: 340px;
+    display: flex; align-items: stretch; justify-content: center;
+    touch-action: pan-y;
+  }
+  .tcard {
+    position: absolute; inset: 0; margin: auto;
+    max-height: 420px;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 24px; box-shadow: var(--shadow);
+    display: flex; flex-direction: column; justify-content: center; gap: 8px;
+    padding: 28px 24px; text-align: center;
+    will-change: transform; user-select: none; -webkit-user-select: none;
+  }
+  .tcard.behind { transform: scale(.94) translateY(14px); opacity: .6; }
+  .tcard .tdate { color: var(--muted); font-size: 13.5px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; }
+  .tcard .tamount { font-size: 44px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+  .tcard .tdesc { font-size: 16.5px; line-height: 1.4; color: var(--ink); overflow-wrap: anywhere; }
+  .tcard .tcredit {
+    align-self: center; margin-top: 6px; font-size: 12.5px; font-weight: 700;
+    background: var(--surface-2); color: var(--muted); border-radius: 999px; padding: 4px 10px;
+  }
+  .stamp {
+    position: absolute; top: 22px; font-size: 26px; font-weight: 800; letter-spacing: 2px;
+    padding: 4px 14px; border-radius: 10px; border: 3px solid; opacity: 0;
+    transform: rotate(0deg); pointer-events: none;
+  }
+  .stamp.ich { right: 18px; color: var(--ich); border-color: var(--ich); transform: rotate(12deg); }
+  .stamp.mama { left: 18px; color: var(--mama); border-color: var(--mama); transform: rotate(-12deg); }
+
+  .swipe-actions {
+    display: flex; align-items: center; justify-content: center; gap: 18px;
+    padding: 22px 0 6px;
+  }
+  .act {
+    appearance: none; cursor: pointer; border-radius: 50%;
+    display: grid; place-items: center; font-weight: 800;
+    border: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow);
+  }
+  .act.big { width: 76px; height: 76px; font-size: 15px; }
+  .act.small { width: 52px; height: 52px; font-size: 20px; color: var(--muted); }
+  .act.mama-btn { color: var(--mama); border-color: var(--mama); background: var(--mama-soft); }
+  .act.ich-btn { color: var(--ich); border-color: var(--ich); background: var(--ich-soft); }
+  .swipe-legend { text-align: center; color: var(--muted); font-size: 13px; padding-bottom: 4px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tcard, .progress i, .toast { transition: none !important; }
+  }
+
+  /* ---------- Done ---------- */
+  .totals { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 10px 0 18px; }
+  .total-card {
+    border-radius: var(--radius); padding: 18px 16px; text-align: center;
+    border: 1px solid var(--line);
+  }
+  .total-card.ich { background: var(--ich-soft); border-color: transparent; }
+  .total-card.mama { background: var(--mama-soft); border-color: transparent; }
+  .total-card .tl { font-size: 13px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; }
+  .total-card.ich .tl { color: var(--ich); }
+  .total-card.mama .tl { color: var(--mama); }
+  .total-card .tv { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 4px; }
+  .total-card .tc { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+
+  details.plist { border: 1px solid var(--line); border-radius: 16px; background: var(--surface); overflow: hidden; }
+  details.plist summary {
+    padding: 14px 16px; font-weight: 700; font-size: 15px; cursor: pointer; list-style: none;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  details.plist summary::-webkit-details-marker { display: none; }
+  .plist ul { list-style: none; margin: 0; padding: 0 8px 8px; }
+  .plist li {
+    display: flex; gap: 10px; align-items: center; padding: 10px 8px;
+    border-top: 1px solid var(--line); font-size: 14px; cursor: pointer; border-radius: 8px;
+  }
+  .plist li .d { color: var(--muted); flex: none; font-variant-numeric: tabular-nums; font-size: 12.5px; }
+  .plist li .n { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .plist li .a { font-variant-numeric: tabular-nums; font-weight: 700; flex: none; }
+  .plist .moveHint { font-size: 12px; color: var(--muted); padding: 6px 16px 12px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="bar">
+    <button class="backbtn" id="backBtn" hidden>‹ Zurück</button>
+    <div class="title rounded" id="barTitle">KK</div>
+    <div class="spacer"></div>
+  </header>
+
+  <!-- LOCK -->
+  <section class="screen" id="scr-lock">
+    <div class="lockwrap">
+      <div class="lockicon">🔒</div>
+      <h1 class="rounded">PIN eingeben</h1>
+      <input class="pin" id="pinInput" inputmode="numeric" autocomplete="one-time-code" maxlength="8" aria-label="PIN">
+      <button class="btn" id="pinBtn">Entsperren</button>
+    </div>
+  </section>
+
+  <!-- HOME -->
+  <section class="screen" id="scr-home">
+    <h1 class="rounded">Wer bist du?</h1>
+    <p class="sub">Private Zuordnung der Kartenabrechnung. Die Daten bleiben nur auf euren Handys.</p>
+    <div class="who">
+      <button id="pickMichi">
+        <span class="avatar av-m rounded">M</span>
+        <span><span class="name rounded">Michi</span><br><span class="role">Admin · Abrechnung hochladen</span></span>
+      </button>
+      <button id="pickVanessa">
+        <span class="avatar av-v rounded">V</span>
+        <span><span class="name rounded">Vanessa</span><br><span class="role">Positionen zuordnen (swipen)</span></span>
+      </button>
+    </div>
+  </section>
+
+  <!-- MICHI -->
+  <section class="screen" id="scr-michi">
+    <h1 class="rounded">Abrechnung hochladen</h1>
+    <p class="sub">Lade die CSV-Datei aus dem Amex-Konto hoch. Sie wird nur hier im Browser gelesen und nirgendwohin übertragen. Daraus entsteht ein Code, den du z.&nbsp;B. per WhatsApp weitergibst.</p>
+    <div class="stack">
+      <label class="filelabel" for="csvFile">
+        <strong>CSV auswählen</strong>
+        Amex-Export (Datum, Beschreibung, Betrag)
+        <input type="file" id="csvFile" accept=".csv,text/csv,text/plain">
+      </label>
+      <div class="card-panel" id="holderPanel" hidden>
+        <div class="holder-label">Nur Umsätze von …</div>
+        <div class="holder-chips" id="holderChips"></div>
+      </div>
+      <div class="card-panel" id="parsePanel" hidden>
+        <div class="kv"><span>Positionen</span><span class="v" id="pCount">–</span></div>
+        <div class="kv"><span>Summe</span><span class="v" id="pSum">–</span></div>
+        <div class="kv" id="pCreditRow" hidden><span>davon Gutschriften</span><span class="v" id="pCredits">–</span></div>
+        <div class="kv" id="pSkipRow" hidden><span>aussortiert (andere Karteninhaber)</span><span class="v" id="pSkipped">–</span></div>
+      </div>
+      <button class="btn" id="shareCodeBtn" disabled>Code senden</button>
+      <button class="btn secondary" id="copyCodeBtn" disabled>Code kopieren</button>
+      <textarea class="code" id="codeOut" readonly hidden></textarea>
+      <button class="btn ghost" id="swipeHereBtn" disabled>Oder: direkt auf diesem Gerät swipen</button>
+      <p class="hint">Der Code enthält die ausgewählten Transaktionen in komprimierter Form. Er wird nirgendwo hochgeladen – nur du entscheidest, an wen du ihn schickst.</p>
+    </div>
+  </section>
+
+  <!-- VANESSA: LOAD -->
+  <section class="screen" id="scr-load">
+    <h1 class="rounded">Hallo Vanessa 👋</h1>
+    <p class="sub">Füge hier den Code ein, den Michi dir geschickt hat. Danach kannst du jederzeit weiterswipen – der Stand wird auf deinem Handy gespeichert.</p>
+    <div class="stack">
+      <textarea class="code" id="codeIn" placeholder="Code von Michi hier einfügen …"></textarea>
+      <button class="btn" id="loadCodeBtn">Los geht’s</button>
+    </div>
+  </section>
+
+  <!-- SWIPE -->
+  <section class="screen" id="scr-swipe">
+    <div class="swipe-top">
+      <span class="chip mama">Mama <span id="chipMama">0,00 €</span></span>
+      <span class="chip ich">Ich <span id="chipIch">0,00 €</span></span>
+      <span class="counter" id="counter">0 / 0</span>
+    </div>
+    <div class="progress"><i id="progressBar" style="width:0%"></i></div>
+    <div class="deck" id="deck"></div>
+    <div class="swipe-actions">
+      <button class="act big mama-btn rounded" id="btnMama" aria-label="Mama zuordnen">Mama</button>
+      <button class="act small" id="btnUndo" aria-label="Rückgängig">↩</button>
+      <button class="act big ich-btn rounded" id="btnIch" aria-label="Mir zuordnen">Ich</button>
+    </div>
+    <div class="swipe-legend">← links wischen: Mama &nbsp;·&nbsp; rechts wischen: Ich →</div>
+  </section>
+
+  <!-- DONE -->
+  <section class="screen" id="scr-done">
+    <h1 class="rounded">Alles zugeordnet 🎉</h1>
+    <p class="sub">So sieht die Aufteilung aus. Tippe auf eine Position, um sie noch der anderen Person zuzuschieben.</p>
+    <div class="totals">
+      <div class="total-card mama"><div class="tl">Mama</div><div class="tv" id="totMama">0,00 €</div><div class="tc" id="cntMama"></div></div>
+      <div class="total-card ich"><div class="tl">Ich</div><div class="tv" id="totIch">0,00 €</div><div class="tc" id="cntIch"></div></div>
+    </div>
+    <div class="stack">
+      <details class="plist" id="listMamaWrap">
+        <summary>Positionen Mama <span id="sumMamaMini"></span></summary>
+        <ul id="listMama"></ul>
+        <div class="moveHint">Tippen = zu „Ich“ verschieben</div>
+      </details>
+      <details class="plist" id="listIchWrap">
+        <summary>Positionen Ich <span id="sumIchMini"></span></summary>
+        <ul id="listIch"></ul>
+        <div class="moveHint">Tippen = zu „Mama“ verschieben</div>
+      </details>
+      <button class="btn" id="shareResultBtn">Ergebnis senden</button>
+      <button class="btn secondary" id="saveResultBtn">Als CSV speichern</button>
+      <button class="btn danger" id="clearBtn">Geklärt ✓ – Daten löschen</button>
+      <p class="hint">„Geklärt“ löscht alle Transaktionsdaten endgültig von diesem Gerät.</p>
+    </div>
+  </section>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var LS_KEY = "kk_session_v1";
+  var LS_UNLOCK = "kk_unlock_v1";
+  var PIN_HASH = "02459914c1847dd1fddeaaeb81f8cfa1a15de3f3bbc8c4688e93424edfeeec1f";
+  var $ = function (id) { return document.getElementById(id); };
+
+  var state = null;        // {items:[{d,n,c}], decisions:[null|'ich'|'mama']}
+  var parsedAll = null;    // Michi upload buffer incl. holder
+  var holderNames = [];
+  var selectedHolder = null;
+  var currentCode = null;
+
+  // ---------- utils ----------
+  function euro(cents) {
+    var v = (cents / 100).toFixed(2).replace(".", ",");
+    return v.replace(/\B(?=(\d{3})+(?!\d))/g, ".") + " €";
+  }
+  function toast(msg) {
+    var t = $("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(t._h);
+    t._h = setTimeout(function () { t.classList.remove("show"); }, 2400);
+  }
+  function save() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+  function load() {
+    try {
+      var raw = localStorage.getItem(LS_KEY);
+      if (raw) state = JSON.parse(raw);
+    } catch (e) { state = null; }
+  }
+  function wipe() {
+    state = null;
+    try { localStorage.removeItem(LS_KEY); } catch (e) {}
+  }
+  function sha256Hex(str) {
+    return crypto.subtle.digest("SHA-256", new TextEncoder().encode(str)).then(function (buf) {
+      return Array.prototype.map.call(new Uint8Array(buf), function (b) {
+        return b.toString(16).padStart(2, "0");
+      }).join("");
+    });
+  }
+
+  // ---------- screens ----------
+  var screens = ["lock", "home", "michi", "load", "swipe", "done"];
+  function show(name) {
+    screens.forEach(function (s) {
+      $("scr-" + s).classList.toggle("active", s === name);
+    });
+    $("backBtn").hidden = (name === "home" || name === "lock");
+    $("barTitle").textContent = {
+      lock: "KK", home: "KK", michi: "Michi · Admin", load: "Vanessa",
+      swipe: "Zuordnen", done: "Ergebnis"
+    }[name];
+    if (name === "swipe") renderDeck();
+    if (name === "done") renderDone();
+  }
+  $("backBtn").addEventListener("click", function () { show("home"); });
+
+  // ---------- lock ----------
+  function tryUnlock() {
+    var pin = $("pinInput").value.trim();
+    if (!pin) return;
+    sha256Hex(pin).then(function (hex) {
+      if (hex === PIN_HASH) {
+        try { localStorage.setItem(LS_UNLOCK, PIN_HASH); } catch (e) {}
+        $("pinInput").value = "";
+        show("home");
+      } else {
+        $("pinInput").value = "";
+        toast("Falsche PIN");
+      }
+    });
+  }
+  $("pinBtn").addEventListener("click", tryUnlock);
+  $("pinInput").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") tryUnlock();
+  });
+
+  $("pickMichi").addEventListener("click", function () { show("michi"); });
+  $("pickVanessa").addEventListener("click", function () {
+    load();
+    if (state && state.items && state.items.length) {
+      var open = state.decisions.indexOf(null);
+      show(open === -1 ? "done" : "swipe");
+    } else {
+      show("load");
+    }
+  });
+
+  // ---------- CSV parsing ----------
+  function parseCSV(text, delim) {
+    var rows = [], row = [], cur = "", inQ = false;
+    for (var i = 0; i < text.length; i++) {
+      var ch = text[i];
+      if (inQ) {
+        if (ch === '"') {
+          if (text[i + 1] === '"') { cur += '"'; i++; }
+          else inQ = false;
+        } else cur += ch;
+      } else if (ch === '"') {
+        inQ = true;
+      } else if (ch === delim) {
+        row.push(cur); cur = "";
+      } else if (ch === "\n" || ch === "\r") {
+        if (ch === "\r" && text[i + 1] === "\n") i++;
+        row.push(cur); cur = "";
+        if (row.length > 1 || row[0] !== "") rows.push(row);
+        row = [];
+      } else cur += ch;
+    }
+    row.push(cur);
+    if (row.length > 1 || row[0] !== "") rows.push(row);
+    return rows;
+  }
+  function sniffDelim(text) {
+    var head = text.split(/\r?\n/).slice(0, 5).join("\n");
+    var counts = [[";", 0], [",", 0], ["\t", 0]];
+    counts.forEach(function (c) {
+      c[1] = (head.match(new RegExp("\\" + c[0], "g")) || []).length;
+    });
+    counts.sort(function (a, b) { return b[1] - a[1]; });
+    return counts[0][1] > 0 ? counts[0][0] : ",";
+  }
+  function parseAmount(s) {
+    if (s == null) return null;
+    s = String(s).trim().replace(/[€\s]/g, "");
+    if (!s) return null;
+    var neg = /^-/.test(s) || /-$/.test(s);
+    s = s.replace(/-/g, "");
+    var lastComma = s.lastIndexOf(","), lastDot = s.lastIndexOf(".");
+    if (lastComma > lastDot) {
+      s = s.replace(/\./g, "").replace(",", ".");
+    } else if (lastDot > lastComma) {
+      s = s.replace(/,/g, "");
+    }
+    var v = parseFloat(s);
+    if (isNaN(v)) return null;
+    var cents = Math.round(v * 100);
+    return neg ? -cents : cents;
+  }
+  function findCols(header) {
+    var h = header.map(function (x) { return String(x).toLowerCase(); });
+    function idx(keys) {
+      for (var i = 0; i < h.length; i++)
+        for (var k = 0; k < keys.length; k++)
+          if (h[i].indexOf(keys[k]) !== -1) return i;
+      return -1;
+    }
+    return {
+      date: idx(["datum", "date"]),
+      desc: idx(["beschreibung", "description", "verwendung", "händler", "haendler", "merchant"]),
+      amount: idx(["betrag", "amount", "umsatz"]),
+      holder: idx(["karteninhaber", "kartenmitglied", "card member", "cardmember", "inhaber"])
+    };
+  }
+  function parseAmexCSV(text) {
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    var delim = sniffDelim(text);
+    var rows = parseCSV(text, delim).filter(function (r) {
+      return r.some(function (c) { return String(c).trim() !== ""; });
+    });
+    if (!rows.length) return [];
+    var cols = findCols(rows[0]);
+    var start = 0;
+    if (cols.amount !== -1 && cols.date !== -1) {
+      start = 1;
+    } else {
+      // no header: assume date, description, ..., amount(last)
+      cols = { date: 0, desc: 1, amount: rows[0].length - 1, holder: -1 };
+    }
+    var items = [];
+    for (var i = start; i < rows.length; i++) {
+      var r = rows[i];
+      var cents = parseAmount(r[cols.amount]);
+      if (cents === null) continue;
+      var date = String(r[cols.date] || "").trim();
+      var desc = String(r[cols.desc >= 0 ? cols.desc : 1] || "").trim().replace(/\s+/g, " ");
+      if (!desc) desc = "(ohne Beschreibung)";
+      var holder = cols.holder >= 0 ? String(r[cols.holder] || "").trim() : "";
+      items.push({ d: date, n: desc.slice(0, 120), c: cents, h: holder });
+    }
+    return items;
+  }
+
+  // ---------- code encode/decode ----------
+  function b64urlFromBytes(bytes) {
+    var bin = "";
+    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function bytesFromB64url(s) {
+    s = s.replace(/-/g, "+").replace(/_/g, "/");
+    while (s.length % 4) s += "=";
+    var bin = atob(s), out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  function encodeItems(items) {
+    var slim = items.map(function (it) { return { d: it.d, n: it.n, c: it.c }; });
+    var json = JSON.stringify({ v: 1, items: slim });
+    var raw = new TextEncoder().encode(json);
+    if (typeof CompressionStream !== "undefined") {
+      var cs = new CompressionStream("deflate-raw");
+      var stream = new Blob([raw]).stream().pipeThrough(cs);
+      return new Response(stream).arrayBuffer().then(function (buf) {
+        return "KK1." + b64urlFromBytes(new Uint8Array(buf));
+      });
+    }
+    return Promise.resolve("KK0." + b64urlFromBytes(raw));
+  }
+  function decodeItems(code) {
+    code = code.trim().replace(/\s+/g, "");
+    var m = code.match(/KK([01])\.([A-Za-z0-9_-]+)/);
+    if (!m) return Promise.reject(new Error("bad"));
+    var bytes = bytesFromB64url(m[2]);
+    var p;
+    if (m[1] === "1") {
+      if (typeof DecompressionStream === "undefined") return Promise.reject(new Error("nods"));
+      var ds = new DecompressionStream("deflate-raw");
+      p = new Response(new Blob([bytes]).stream().pipeThrough(ds)).arrayBuffer()
+        .then(function (buf) { return new TextDecoder().decode(buf); });
+    } else {
+      p = Promise.resolve(new TextDecoder().decode(bytes));
+    }
+    return p.then(function (json) {
+      var obj = JSON.parse(json);
+      if (!obj || !Array.isArray(obj.items) || !obj.items.length) throw new Error("empty");
+      return obj.items;
+    });
+  }
+
+  // ---------- Michi ----------
+  function activeItems() {
+    if (!parsedAll) return [];
+    if (holderNames.length > 1) {
+      if (!selectedHolder) return [];
+      return parsedAll.filter(function (it) { return it.h === selectedHolder; });
+    }
+    return parsedAll;
+  }
+  function renderHolderChips() {
+    var wrap = $("holderChips");
+    wrap.innerHTML = "";
+    holderNames.forEach(function (name) {
+      var count = parsedAll.filter(function (it) { return it.h === name; }).length;
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "holder-chip" + (name === selectedHolder ? " sel" : "");
+      b.textContent = name + " (" + count + ")";
+      b.addEventListener("click", function () {
+        selectedHolder = name;
+        currentCode = null;
+        $("codeOut").hidden = true;
+        renderHolderChips();
+        updatePanel();
+      });
+      wrap.appendChild(b);
+    });
+  }
+  function updatePanel() {
+    var items = activeItems();
+    var ready = items.length > 0;
+    $("shareCodeBtn").disabled = !ready;
+    $("copyCodeBtn").disabled = !ready;
+    $("swipeHereBtn").disabled = !ready;
+    if (!parsedAll) return;
+    if (!ready) {
+      $("parsePanel").hidden = true;
+      return;
+    }
+    var sum = 0, credits = 0, creditCount = 0;
+    items.forEach(function (it) {
+      sum += it.c;
+      if (it.c < 0) { credits += it.c; creditCount++; }
+    });
+    var skipped = parsedAll.length - items.length;
+    $("pCount").textContent = items.length;
+    $("pSum").textContent = euro(sum);
+    $("pCreditRow").hidden = creditCount === 0;
+    $("pCredits").textContent = creditCount + " (" + euro(credits) + ")";
+    $("pSkipRow").hidden = skipped === 0;
+    $("pSkipped").textContent = skipped;
+    $("parsePanel").hidden = false;
+  }
+  $("csvFile").addEventListener("change", function () {
+    var f = this.files && this.files[0];
+    if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function () {
+      var items;
+      try { items = parseAmexCSV(String(rd.result)); } catch (e) { items = []; }
+      if (!items.length) {
+        toast("Konnte keine Positionen in der CSV finden");
+        return;
+      }
+      parsedAll = items;
+      currentCode = null;
+      $("codeOut").hidden = true;
+      var seen = {};
+      holderNames = [];
+      items.forEach(function (it) {
+        if (it.h && !seen[it.h]) { seen[it.h] = true; holderNames.push(it.h); }
+      });
+      selectedHolder = null;
+      if (holderNames.length > 1) {
+        $("holderPanel").hidden = false;
+        renderHolderChips();
+        toast(items.length + " Positionen – bitte Karteninhaber wählen");
+      } else {
+        $("holderPanel").hidden = true;
+        toast(items.length + " Positionen eingelesen");
+      }
+      updatePanel();
+    };
+    rd.readAsText(f, "utf-8");
+  });
+
+  function ensureCode() {
+    if (currentCode) return Promise.resolve(currentCode);
+    return encodeItems(activeItems()).then(function (c) {
+      currentCode = c;
+      return c;
+    });
+  }
+  function showCodeFallback(code) {
+    var out = $("codeOut");
+    out.value = code;
+    out.hidden = false;
+    out.focus();
+    out.select();
+    toast("Code markiert – manuell kopieren");
+  }
+  $("shareCodeBtn").addEventListener("click", function () {
+    if (!activeItems().length) return;
+    ensureCode().then(function (code) {
+      var text = "Code für die neue Abrechnung:\n\n" + code;
+      if (navigator.share) {
+        navigator.share({ text: text }).catch(function () {});
+      } else {
+        showCodeFallback(code);
+      }
+    });
+  });
+  $("copyCodeBtn").addEventListener("click", function () {
+    if (!activeItems().length) return;
+    ensureCode().then(function (code) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(
+          function () { toast("Code kopiert"); },
+          function () { showCodeFallback(code); }
+        );
+      } else showCodeFallback(code);
+    });
+  });
+  $("swipeHereBtn").addEventListener("click", function () {
+    var items = activeItems();
+    if (items.length) startSession(items);
+  });
+
+  // ---------- Vanessa load ----------
+  $("loadCodeBtn").addEventListener("click", function () {
+    var code = $("codeIn").value;
+    if (!code.trim()) { toast("Bitte zuerst den Code einfügen"); return; }
+    decodeItems(code).then(function (items) {
+      $("codeIn").value = "";
+      startSession(items);
+    }).catch(function () {
+      toast("Code ungültig – bitte komplett kopieren und erneut einfügen");
+    });
+  });
+
+  function startSession(items) {
+    state = {
+      items: items.map(function (it) { return { d: it.d, n: it.n, c: it.c }; }),
+      decisions: items.map(function () { return null; })
+    };
+    save();
+    show("swipe");
+  }
+
+  // ---------- Swipe ----------
+  function nextIndex() { return state.decisions.indexOf(null); }
+  function totals() {
+    var t = { ich: 0, mama: 0, nIch: 0, nMama: 0 };
+    state.decisions.forEach(function (d, i) {
+      if (d === "ich") { t.ich += state.items[i].c; t.nIch++; }
+      if (d === "mama") { t.mama += state.items[i].c; t.nMama++; }
+    });
+    return t;
+  }
+  function updateSwipeHeader() {
+    var t = totals();
+    $("chipIch").textContent = euro(t.ich);
+    $("chipMama").textContent = euro(t.mama);
+    var done = t.nIch + t.nMama;
+    $("counter").textContent = done + " / " + state.items.length;
+    $("progressBar").style.width = (done / state.items.length * 100) + "%";
+  }
+  function buildCard(item) {
+    var el = document.createElement("div");
+    el.className = "tcard";
+    el.innerHTML =
+      '<span class="stamp mama">MAMA</span>' +
+      '<span class="stamp ich">ICH</span>' +
+      '<div class="tdate"></div>' +
+      '<div class="tamount rounded"></div>' +
+      '<div class="tdesc"></div>' +
+      (item.c < 0 ? '<div class="tcredit">Gutschrift</div>' : "");
+    el.querySelector(".tdate").textContent = item.d;
+    el.querySelector(".tamount").textContent = euro(Math.abs(item.c)) + (item.c < 0 ? " −" : "");
+    el.querySelector(".tdesc").textContent = item.n;
+    return el;
+  }
+  function renderDeck() {
+    updateSwipeHeader();
+    var deck = $("deck");
+    deck.innerHTML = "";
+    var idx = nextIndex();
+    if (idx === -1) { show("done"); return; }
+    var undecided = [];
+    for (var i = idx; i < state.items.length && undecided.length < 2; i++) {
+      if (state.decisions[i] === null) undecided.push(i);
+    }
+    if (undecided[1] !== undefined) {
+      var behind = buildCard(state.items[undecided[1]]);
+      behind.classList.add("behind");
+      deck.appendChild(behind);
+    }
+    var top = buildCard(state.items[undecided[0]]);
+    deck.appendChild(top);
+    attachDrag(top, undecided[0]);
+  }
+  function decide(idx, who, el, fromDrag) {
+    state.decisions[idx] = who;
+    save();
+    var dir = who === "ich" ? 1 : -1;
+    if (el) {
+      el.style.transition = "transform .32s ease-out, opacity .32s";
+      el.style.transform = "translateX(" + (dir * (window.innerWidth + 120)) + "px) rotate(" + dir * 24 + "deg)";
+      el.style.opacity = "0";
+      setTimeout(renderDeck, fromDrag ? 200 : 260);
+    } else {
+      renderDeck();
+    }
+  }
+  function attachDrag(el, idx) {
+    var startX = 0, startY = 0, dx = 0, dragging = false, pid = null;
+    var stampIch = el.querySelector(".stamp.ich");
+    var stampMama = el.querySelector(".stamp.mama");
+    el.addEventListener("pointerdown", function (e) {
+      dragging = true; pid = e.pointerId;
+      startX = e.clientX; startY = e.clientY; dx = 0;
+      el.setPointerCapture(pid);
+      el.style.transition = "none";
+    });
+    el.addEventListener("pointermove", function (e) {
+      if (!dragging) return;
+      dx = e.clientX - startX;
+      var dy = e.clientY - startY;
+      el.style.transform = "translate(" + dx + "px," + (dy * 0.15) + "px) rotate(" + (dx / 18) + "deg)";
+      var p = Math.min(1, Math.abs(dx) / 90);
+      stampIch.style.opacity = dx > 0 ? p : 0;
+      stampMama.style.opacity = dx < 0 ? p : 0;
+    });
+    function release() {
+      if (!dragging) return;
+      dragging = false;
+      var threshold = Math.min(130, window.innerWidth * 0.32);
+      if (dx > threshold) decide(idx, "ich", el, true);
+      else if (dx < -threshold) decide(idx, "mama", el, true);
+      else {
+        el.style.transition = "transform .25s";
+        el.style.transform = "";
+        stampIch.style.opacity = 0;
+        stampMama.style.opacity = 0;
+      }
+    }
+    el.addEventListener("pointerup", release);
+    el.addEventListener("pointercancel", release);
+  }
+  $("btnIch").addEventListener("click", function () {
+    var idx = nextIndex();
+    if (idx !== -1) decide(idx, "ich", $("deck").lastElementChild, false);
+  });
+  $("btnMama").addEventListener("click", function () {
+    var idx = nextIndex();
+    if (idx !== -1) decide(idx, "mama", $("deck").lastElementChild, false);
+  });
+  $("btnUndo").addEventListener("click", function () {
+    var idx = nextIndex();
+    var last = -1;
+    var end = idx === -1 ? state.items.length : idx;
+    for (var i = 0; i < end; i++) if (state.decisions[i] !== null) last = i;
+    if (last === -1) { toast("Nichts zum Rückgängigmachen"); return; }
+    state.decisions[last] = null;
+    save();
+    renderDeck();
+  });
+
+  // ---------- Done ----------
+  function renderDone() {
+    var t = totals();
+    $("totIch").textContent = euro(t.ich);
+    $("totMama").textContent = euro(t.mama);
+    $("cntIch").textContent = t.nIch + " Positionen";
+    $("cntMama").textContent = t.nMama + " Positionen";
+    $("sumIchMini").textContent = t.nIch;
+    $("sumMamaMini").textContent = t.nMama;
+    ["ich", "mama"].forEach(function (who) {
+      var ul = $(who === "ich" ? "listIch" : "listMama");
+      ul.innerHTML = "";
+      state.decisions.forEach(function (d, i) {
+        if (d !== who) return;
+        var it = state.items[i];
+        var li = document.createElement("li");
+        li.innerHTML = '<span class="d"></span><span class="n"></span><span class="a"></span>';
+        li.querySelector(".d").textContent = it.d;
+        li.querySelector(".n").textContent = it.n;
+        li.querySelector(".a").textContent = euro(it.c);
+        li.addEventListener("click", function () {
+          state.decisions[i] = who === "ich" ? "mama" : "ich";
+          save();
+          renderDone();
+        });
+        ul.appendChild(li);
+      });
+    });
+  }
+
+  function resultText() {
+    var t = totals();
+    return "Ergebnis der Abrechnung\n" +
+      "Mama: " + euro(t.mama) + " (" + t.nMama + " Positionen)\n" +
+      "Ich (Vanessa): " + euro(t.ich) + " (" + t.nIch + " Positionen)";
+  }
+  function resultCSV() {
+    var lines = ["Datum;Beschreibung;Betrag;Zuordnung"];
+    state.decisions.forEach(function (d, i) {
+      var it = state.items[i];
+      lines.push([it.d, '"' + it.n.replace(/"/g, '""') + '"',
+        (it.c / 100).toFixed(2).replace(".", ","),
+        d === "ich" ? "Vanessa" : "Mama"].join(";"));
+    });
+    var t = totals();
+    lines.push("");
+    lines.push("Summe Mama;;" + (t.mama / 100).toFixed(2).replace(".", ",") + ";");
+    lines.push("Summe Vanessa;;" + (t.ich / 100).toFixed(2).replace(".", ",") + ";");
+    return lines.join("\n");
+  }
+  $("shareResultBtn").addEventListener("click", function () {
+    var text = resultText();
+    if (navigator.share) {
+      navigator.share({ text: text }).catch(function () {});
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(
+        function () { toast("Ergebnis kopiert"); },
+        function () { toast(text); }
+      );
+    } else toast(text);
+  });
+  $("saveResultBtn").addEventListener("click", function () {
+    var blob = new Blob(["\uFEFF" + resultCSV()], { type: "text/csv;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "abrechnung-ergebnis.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+    toast("CSV wird gespeichert");
+  });
+  $("clearBtn").addEventListener("click", function () {
+    if (!confirm("Wirklich alles löschen? Die Zuordnung und alle Transaktionen werden von diesem Gerät entfernt.")) return;
+    wipe();
+    toast("Alles gelöscht ✓");
+    show("home");
+  });
+
+  // ---------- boot ----------
+  var unlocked = false;
+  try { unlocked = localStorage.getItem(LS_UNLOCK) === PIN_HASH; } catch (e) {}
+  show(unlocked ? "home" : "lock");
+})();
+</script>
+</body>
+</html>
