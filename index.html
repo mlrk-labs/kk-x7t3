@@ -298,6 +298,13 @@
   .plist li .nb { flex: none; opacity: .55; padding: 0 2px; }
   .plist li .note { color: var(--muted); font-size: 12.5px; font-style: italic; margin-top: 3px; overflow-wrap: anywhere; }
   .plist .moveHint { font-size: 12px; color: var(--muted); padding: 6px 16px 12px; }
+  .plist li .mv {
+    appearance: none; cursor: pointer; flex: none;
+    border-radius: 999px; padding: 5px 11px; font-size: 12.5px; font-weight: 700;
+    border: 1px solid; background: transparent;
+  }
+  .plist li .mv.ich { color: var(--ich); border-color: var(--ich); background: var(--ich-soft); }
+  .plist li .mv.mama { color: var(--mama); border-color: var(--mama); background: var(--mama-soft); }
 </style>
 </head>
 <body>
@@ -396,13 +403,14 @@
     <div class="swipe-actions">
       <button class="act big mama-btn rounded" id="btnMama" aria-label="Mama zuordnen">Mama</button>
       <button class="act small" id="btnUndo" aria-label="Rückgängig">↩</button>
+      <button class="act small" id="btnSkip" aria-label="Überspringen">⏭</button>
       <button class="act big ich-btn rounded" id="btnIch" aria-label="Mir zuordnen">Ich</button>
     </div>
     <div class="extra-actions">
       <button class="btn ghost" id="btnNote">💬 Kommentar</button>
       <button class="btn ghost" id="btnSplit">⑂ Betrag aufteilen</button>
     </div>
-    <div class="swipe-legend">← links wischen: Mama &nbsp;·&nbsp; rechts wischen: Ich →</div>
+    <div class="swipe-legend">← links: Mama &nbsp;·&nbsp; rechts: Ich → &nbsp;·&nbsp; ⏭ überspringen (erst nachschauen)</div>
   </section>
 
   <!-- DONE -->
@@ -418,6 +426,7 @@
         <div class="kv"><span>Ausgaben gesamt (ohne Gutschriften)</span><span class="v" id="sGross">–</span></div>
         <div class="kv"><span>Gutschriften</span><span class="v" id="sCredit">–</span></div>
         <div class="kv"><span>Saldo gesamt (mit Gutschriften)</span><span class="v" id="sNet">–</span></div>
+        <div class="kv" id="sSkipRow" hidden><span>Übersprungen (zählt nirgends)</span><span class="v" id="sSkip">–</span></div>
       </div>
       <details class="plist" id="listMamaWrap">
         <summary>Positionen Mama <span id="sumMamaMini"></span></summary>
@@ -428,6 +437,11 @@
         <summary>Positionen Ich <span id="sumIchMini"></span></summary>
         <ul id="listIch"></ul>
         <div class="moveHint">Tippen = zu „Mama“ verschieben</div>
+      </details>
+      <details class="plist" id="listSkipWrap" hidden>
+        <summary>Übersprungen <span id="sumSkipMini"></span></summary>
+        <ul id="listSkip"></ul>
+        <div class="moveHint">Zählt in keiner Summe mit – mit den Knöpfen einer Person zuordnen</div>
       </details>
       <button class="btn" id="shareResultBtn">Ergebnis senden</button>
       <div class="pdfrow">
@@ -477,6 +491,9 @@
     try { localStorage.setItem(LS_DB, JSON.stringify(db)); } catch (e) {}
   }
   function normId(name) { return name.trim().toLowerCase(); }
+  function isPayment(it) {
+    return it.c < 0 && /((zahlung|überweisung|ueberweisung|payment).*(erhalten|received)|besten dank|thank you)/i.test(it.n);
+  }
   function setCur(id) { curId = id; state = db.statements[id] || null; }
   function openCount(s) {
     return s.decisions.filter(function (d) { return d === null; }).length;
@@ -491,6 +508,9 @@
       var s = db.statements[id];
       if (!s.owner) s.owner = "Vanessa";
       if (!s.notes) s.notes = s.items.map(function () { return ""; });
+      s.decisions.forEach(function (d, i) {
+        if (d === null && isPayment(s.items[i])) s.decisions[i] = "skip";
+      });
     });
     // Migration von v1 (eine einzelne Abrechnung ohne Namen)
     try {
@@ -913,7 +933,7 @@
       var k = keyOf(it);
       counts[k] = (counts[k] || 0) + 1;
     });
-    var added = 0, moved = 0;
+    var added = 0, moved = 0, auto = 0;
     items.forEach(function (it) {
       var k = keyOf(it);
       if (counts[k] > 0) { counts[k]--; return; }   // schon vorhanden
@@ -938,13 +958,15 @@
         moved++;
       } else {
         st.items.push({ d: it.d, n: it.n, c: it.c });
-        st.decisions.push(null); st.notes.push("");
+        if (isPayment(it)) { st.decisions.push("skip"); auto++; }
+        else st.decisions.push(null);
+        st.notes.push("");
         added++;
       }
     });
     if (st.decisions.indexOf(null) !== -1) st.cleared = false;
     save();
-    return { id: id, added: added, moved: moved };
+    return { id: id, added: added, moved: moved, auto: auto };
   }
   function totalsOf(s) {
     var t = { ich: 0, mama: 0, nIch: 0, nMama: 0 };
@@ -1012,11 +1034,12 @@
       }
       var res = mergeStatement(obj.name, obj.items, obj.fin, obj.o);
       var msg = "„" + obj.name + "“" + (obj.fin ? " (final)" : "") + ": " + res.added + " neue Positionen";
+      if (res.auto) msg += " · " + res.auto + " Zahlung(en) automatisch übersprungen";
       if (res.moved) msg += " · " + res.moved + " aus anderer Abrechnung übernommen";
       if (!res.added && !res.moved) msg = "„" + obj.name + "“: keine neuen Positionen";
       toast(msg);
       renderOverview();
-      if (res.added > 0) {
+      if (res.added - res.auto > 0) {
         setCur(res.id);
         show("swipe");
       }
@@ -1076,10 +1099,14 @@
   function decide(idx, who, el, fromDrag) {
     state.decisions[idx] = who;
     save();
-    var dir = who === "ich" ? 1 : -1;
     if (el) {
       el.style.transition = "transform .32s ease-out, opacity .32s";
-      el.style.transform = "translateX(" + (dir * (window.innerWidth + 120)) + "px) rotate(" + dir * 24 + "deg)";
+      if (who === "skip") {
+        el.style.transform = "translateY(-120vh)";
+      } else {
+        var dir = who === "ich" ? 1 : -1;
+        el.style.transform = "translateX(" + (dir * (window.innerWidth + 120)) + "px) rotate(" + dir * 24 + "deg)";
+      }
       el.style.opacity = "0";
       setTimeout(renderDeck, fromDrag ? 200 : 260);
     } else {
@@ -1129,6 +1156,10 @@
     var idx = nextIndex();
     if (idx !== -1) decide(idx, "mama", $("deck").lastElementChild, false);
   });
+  $("btnSkip").addEventListener("click", function () {
+    var idx = nextIndex();
+    if (idx !== -1) decide(idx, "skip", $("deck").lastElementChild, false);
+  });
   $("btnUndo").addEventListener("click", function () {
     var idx = nextIndex();
     var last = -1;
@@ -1176,14 +1207,19 @@
   // ---------- Done ----------
   function renderDone() {
     var t = totals();
-    var gross = 0, credit = 0;
-    state.items.forEach(function (it) {
+    var gross = 0, credit = 0, skipSum = 0, skipCount = 0;
+    state.items.forEach(function (it, i) {
+      if (state.decisions[i] === "skip") { skipSum += it.c; skipCount++; return; }
       if (it.c >= 0) gross += it.c;
       else credit += it.c;
     });
     $("sGross").textContent = euro(gross);
     $("sCredit").textContent = euro(credit);
     $("sNet").textContent = euro(gross + credit);
+    $("sSkipRow").hidden = skipCount === 0;
+    $("sSkip").textContent = skipCount + " · " + euro(skipSum);
+    $("listSkipWrap").hidden = skipCount === 0;
+    $("sumSkipMini").textContent = skipCount;
     $("tlIch").textContent = state.owner || "Ich";
     $("pdfIchBtn").textContent = "PDF " + (state.owner || "Vanessa");
     $("totIch").textContent = euro(t.ich);
@@ -1227,21 +1263,53 @@
         ul.appendChild(li);
       });
     });
+    var skUl = $("listSkip");
+    skUl.innerHTML = "";
+    state.decisions.forEach(function (d, i) {
+      if (d !== "skip") return;
+      var it = state.items[i];
+      var li = document.createElement("li");
+      li.style.cursor = "default";
+      li.innerHTML =
+        '<div class="row"><span class="d"></span><span class="n"></span><span class="a"></span>' +
+        '<button class="mv mama" type="button">Mama</button><button class="mv ich" type="button">Ich</button></div>' +
+        '<div class="note"></div>';
+      li.querySelector(".d").textContent = it.d;
+      li.querySelector(".n").textContent = it.n;
+      li.querySelector(".a").textContent = euro(it.c);
+      var note = noteAt(i);
+      li.querySelector(".note").textContent = note;
+      li.querySelector(".note").hidden = !note;
+      li.querySelector(".mv.mama").addEventListener("click", function () {
+        state.decisions[i] = "mama";
+        save();
+        renderDone();
+      });
+      li.querySelector(".mv.ich").addEventListener("click", function () {
+        state.decisions[i] = "ich";
+        save();
+        renderDone();
+      });
+      skUl.appendChild(li);
+    });
   }
 
   function resultText() {
     var t = totals();
-    var gross = 0, credit = 0;
-    state.items.forEach(function (it) {
+    var gross = 0, credit = 0, skipSum = 0, skipCount = 0;
+    state.items.forEach(function (it, i) {
+      if (state.decisions[i] === "skip") { skipSum += it.c; skipCount++; return; }
       if (it.c >= 0) gross += it.c;
       else credit += it.c;
     });
-    return "Ergebnis der Abrechnung „" + state.name + "“\n" +
+    var txt = "Ergebnis der Abrechnung „" + state.name + "“\n" +
       "Mama: " + euro(t.mama) + " (" + t.nMama + " Positionen)\n" +
       (state.owner || "Vanessa") + ": " + euro(t.ich) + " (" + t.nIch + " Positionen)\n" +
       "Gesamt ohne Gutschriften: " + euro(gross) + "\n" +
       "Gutschriften: " + euro(credit) + "\n" +
       "Saldo gesamt: " + euro(gross + credit);
+    if (skipCount) txt += "\nÜbersprungen (zählt nirgends): " + skipCount + " Positionen, " + euro(skipSum);
+    return txt;
   }
   // ---------- PDF ----------
   var WIN_MAP = { 0x20AC: 0x80, 0x201E: 0x84, 0x2026: 0x85, 0x2018: 0x91, 0x2019: 0x92, 0x201C: 0x93, 0x201D: 0x94, 0x2013: 0x96, 0x2014: 0x97 };
