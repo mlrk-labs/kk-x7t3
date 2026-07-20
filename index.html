@@ -1395,21 +1395,23 @@
       skipSum += state.items[i].c;
       skipRows.push(state.items[i]);
     });
-    var ownerDisplay = state.owner || "Vanessa";
-    y -= 28;
-    infoLine("Zur Kontrolle – gesamte Abrechnung", "F2", 11);
-    y -= 2;
-    infoLine("Summe Mama: " + fmt(t.mama), "F1", 9);
-    infoLine("Summe " + ownerDisplay + ": " + fmt(t.ich), "F1", 9);
-    if (skipRows.length) {
-      infoLine("Übersprungen / nicht verrechnet: " + skipRows.length + " Positionen, " + fmt(skipSum), "F1", 9);
-      skipRows.forEach(function (it) {
-        var d2 = it.n.length > 60 ? it.n.slice(0, 59) + "…" : it.n;
-        infoLine(it.d + "   " + d2 + "   " + fmt(it.c), "F3", 8, 55);
-      });
+    if (who === "ich") {
+      var ownerDisplay = state.owner || "Vanessa";
+      y -= 28;
+      infoLine("Zur Kontrolle – gesamte Abrechnung", "F2", 11);
+      y -= 2;
+      infoLine("Summe Mama: " + fmt(t.mama), "F1", 9);
+      infoLine("Summe " + ownerDisplay + ": " + fmt(t.ich), "F1", 9);
+      if (skipRows.length) {
+        infoLine("Übersprungen / nicht verrechnet: " + skipRows.length + " Positionen, " + fmt(skipSum), "F1", 9);
+        skipRows.forEach(function (it) {
+          var d2 = it.n.length > 60 ? it.n.slice(0, 59) + "…" : it.n;
+          infoLine(it.d + "   " + d2 + "   " + fmt(it.c), "F3", 8, 55);
+        });
+      }
+      y -= 4;
+      infoLine("Gesamtsumme der Abrechnung (inkl. Übersprungene): " + fmt(t.mama + t.ich + skipSum), "F2", 10);
     }
-    y -= 4;
-    infoLine("Gesamtsumme der Abrechnung (inkl. Übersprungene): " + fmt(t.mama + t.ich + skipSum), "F2", 10);
     pages.push(cur);
 
     var objs = [];
