@@ -151,6 +151,25 @@
   .holder-chip.sel { background: var(--ich-soft); border-color: var(--ich); color: var(--ich); }
   .holder-label { font-size: 13px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
 
+  input.text {
+    width: 100%; border: 1px solid var(--line); border-radius: 14px;
+    padding: 12px 14px; font-size: 16px; background: var(--surface); color: var(--ink);
+  }
+
+  #stmtList { display: flex; flex-direction: column; gap: 12px; }
+  .stmt {
+    display: flex; flex-direction: column; gap: 4px; text-align: left;
+    appearance: none; cursor: pointer; color: var(--ink);
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow);
+  }
+  .stmt .s-name { font-size: 17px; font-weight: 700; }
+  .stmt .s-status { font-size: 13.5px; color: var(--ich); font-weight: 600; }
+  .stmt.cleared .s-status { color: var(--muted); }
+  .stmt .s-sums { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .sect-label { font-size: 13px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); margin: 10px 0 0; }
+
   textarea.code {
     width: 100%; min-height: 110px; resize: vertical;
     border: 1px solid var(--line); border-radius: 14px; padding: 12px;
@@ -310,8 +329,9 @@
   <!-- MICHI -->
   <section class="screen" id="scr-michi">
     <h1 class="rounded">Abrechnung hochladen</h1>
-    <p class="sub">Lade die CSV-Datei aus dem Amex-Konto hoch. Sie wird nur hier im Browser gelesen und nirgendwohin übertragen. Daraus entsteht ein Code, den du z.&nbsp;B. per WhatsApp weitergibst.</p>
+    <p class="sub">Lade die CSV-Datei aus dem Amex-Konto hoch – auch mehrmals im Monat: Vanessa bekommt automatisch nur die neuen Positionen. Die CSV wird nur hier im Browser gelesen und nirgendwohin übertragen.</p>
     <div class="stack">
+      <input class="text" id="stmtName" placeholder="Name der Abrechnung, z. B. Juni" maxlength="30">
       <label class="filelabel" for="csvFile">
         <strong>CSV auswählen</strong>
         Amex-Export (Datum, Beschreibung, Betrag)
@@ -331,17 +351,26 @@
       <button class="btn secondary" id="copyCodeBtn" disabled>Code kopieren</button>
       <textarea class="code" id="codeOut" readonly hidden></textarea>
       <button class="btn ghost" id="swipeHereBtn" disabled>Oder: direkt auf diesem Gerät swipen</button>
-      <p class="hint">Der Code enthält die ausgewählten Transaktionen in komprimierter Form. Er wird nirgendwo hochgeladen – nur du entscheidest, an wen du ihn schickst.</p>
+      <p class="hint">Der Code enthält die ausgewählten Transaktionen in komprimierter Form. Er wird nirgendwo hochgeladen – nur du entscheidest, an wen du ihn schickst. Für zwei Abrechnungen (z.&nbsp;B. Juni final + Juli) einfach nacheinander zwei CSVs mit je eigenem Namen hochladen und beide Codes schicken.</p>
+
+      <div class="sect-label">Abrechnung beenden</div>
+      <div class="card-panel stack">
+        <p class="hint" style="margin:0">Erst wenn du eine Abrechnung endgültig beendest, verschwindet sie bei Vanessa – auch wenn sie schon „geklärt“ ist. Schicke ihr dazu einen Lösch-Code.</p>
+        <input class="text" id="closeName" placeholder="Name der Abrechnung, z. B. Juni" maxlength="30">
+        <button class="btn secondary" id="closeCodeBtn">Lösch-Code senden</button>
+      </div>
     </div>
   </section>
 
-  <!-- VANESSA: LOAD -->
-  <section class="screen" id="scr-load">
+  <!-- VANESSA: OVERVIEW -->
+  <section class="screen" id="scr-over">
     <h1 class="rounded">Hallo Vanessa 👋</h1>
-    <p class="sub">Füge hier den Code ein, den Michi dir geschickt hat. Danach kannst du jederzeit weiterswipen – der Stand wird auf deinem Handy gespeichert.</p>
+    <p class="sub" id="noStmts">Füge den Code ein, den Michi dir geschickt hat. Danach kannst du jederzeit weiterswipen – der Stand wird auf deinem Handy gespeichert.</p>
     <div class="stack">
-      <textarea class="code" id="codeIn" placeholder="Code von Michi hier einfügen …"></textarea>
-      <button class="btn" id="loadCodeBtn">Los geht’s</button>
+      <div id="stmtList"></div>
+      <div class="sect-label">Code von Michi</div>
+      <textarea class="code" id="codeIn" placeholder="Neuen Code oder Lösch-Code hier einfügen …"></textarea>
+      <button class="btn" id="loadCodeBtn">Code laden</button>
     </div>
   </section>
 
@@ -387,8 +416,8 @@
       </details>
       <button class="btn" id="shareResultBtn">Ergebnis senden</button>
       <button class="btn secondary" id="saveResultBtn">Als PDF speichern</button>
-      <button class="btn danger" id="clearBtn">Geklärt ✓ – Daten löschen</button>
-      <p class="hint">„Geklärt“ löscht alle Transaktionsdaten endgültig von diesem Gerät.</p>
+      <button class="btn danger" id="clearBtn">Geklärt ✓</button>
+      <p class="hint">„Geklärt“ markiert die Abrechnung als erledigt – sie bleibt aber gespeichert, bis Michi sie mit einem Lösch-Code endgültig beendet. Tauchen später neue Positionen auf, öffnet sie sich automatisch wieder.</p>
     </div>
   </section>
 </div>
@@ -399,13 +428,16 @@
 (function () {
   "use strict";
 
-  var LS_KEY = "kk_session_v1";
+  var LS_KEY = "kk_session_v1";      // v1, nur noch für Migration
+  var LS_DB = "kk_db_v2";
   var LS_UNLOCK = "kk_unlock_v1";
   var PIN_HASH = "02459914c1847dd1fddeaaeb81f8cfa1a15de3f3bbc8c4688e93424edfeeec1f";
   var $ = function (id) { return document.getElementById(id); };
 
-  var state = null;        // {items:[{d,n,c}], decisions:[null|'ich'|'mama']}
-  var parsedAll = null;    // Michi upload buffer incl. holder
+  var db = { statements: {} };       // id -> {name, items, decisions, notes, cleared}
+  var curId = null;
+  var state = null;                  // Alias auf die aktuell geöffnete Abrechnung
+  var parsedAll = null;              // Michi upload buffer incl. holder
   var holderNames = [];
   var selectedHolder = null;
   var currentCode = null;
@@ -423,17 +455,37 @@
     t._h = setTimeout(function () { t.classList.remove("show"); }, 2400);
   }
   function save() {
-    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
+    try { localStorage.setItem(LS_DB, JSON.stringify(db)); } catch (e) {}
   }
-  function load() {
+  function normId(name) { return name.trim().toLowerCase(); }
+  function setCur(id) { curId = id; state = db.statements[id] || null; }
+  function openCount(s) {
+    return s.decisions.filter(function (d) { return d === null; }).length;
+  }
+  function loadDb() {
     try {
-      var raw = localStorage.getItem(LS_KEY);
-      if (raw) state = JSON.parse(raw);
-    } catch (e) { state = null; }
-  }
-  function wipe() {
-    state = null;
-    try { localStorage.removeItem(LS_KEY); } catch (e) {}
+      var raw = localStorage.getItem(LS_DB);
+      if (raw) db = JSON.parse(raw) || { statements: {} };
+    } catch (e) {}
+    if (!db.statements) db.statements = {};
+    // Migration von v1 (eine einzelne Abrechnung ohne Namen)
+    try {
+      var old = localStorage.getItem(LS_KEY);
+      if (old) {
+        var s = JSON.parse(old);
+        if (s && s.items && s.items.length) {
+          db.statements[normId("Abrechnung")] = {
+            name: "Abrechnung",
+            items: s.items,
+            decisions: s.decisions,
+            notes: s.notes || s.items.map(function () { return ""; }),
+            cleared: s.decisions.indexOf(null) === -1
+          };
+          save();
+        }
+        localStorage.removeItem(LS_KEY);
+      }
+    } catch (e) {}
   }
   function sha256Hex(str) {
     return crypto.subtle.digest("SHA-256", new TextEncoder().encode(str)).then(function (buf) {
@@ -444,20 +496,27 @@
   }
 
   // ---------- screens ----------
-  var screens = ["lock", "home", "michi", "load", "swipe", "done"];
+  var screens = ["lock", "home", "michi", "over", "swipe", "done"];
+  var currentScreen = "lock";
   function show(name) {
+    currentScreen = name;
     screens.forEach(function (s) {
       $("scr-" + s).classList.toggle("active", s === name);
     });
     $("backBtn").hidden = (name === "home" || name === "lock");
-    $("barTitle").textContent = {
-      lock: "KK", home: "KK", michi: "Michi · Admin", load: "Vanessa",
+    var title = {
+      lock: "KK", home: "KK", michi: "Michi · Admin", over: "Vanessa",
       swipe: "Zuordnen", done: "Ergebnis"
     }[name];
+    if ((name === "swipe" || name === "done") && state) title = state.name;
+    $("barTitle").textContent = title;
+    if (name === "over") renderOverview();
     if (name === "swipe") renderDeck();
     if (name === "done") renderDone();
   }
-  $("backBtn").addEventListener("click", function () { show("home"); });
+  $("backBtn").addEventListener("click", function () {
+    show(currentScreen === "swipe" || currentScreen === "done" ? "over" : "home");
+  });
 
   // ---------- lock ----------
   function tryUnlock() {
@@ -480,18 +539,7 @@
   });
 
   $("pickMichi").addEventListener("click", function () { show("michi"); });
-  $("pickVanessa").addEventListener("click", function () {
-    load();
-    if (state && state.items && !state.notes) {
-      state.notes = state.items.map(function () { return ""; });
-    }
-    if (state && state.items && state.items.length) {
-      var open = state.decisions.indexOf(null);
-      show(open === -1 ? "done" : "swipe");
-    } else {
-      show("load");
-    }
-  });
+  $("pickVanessa").addEventListener("click", function () { show("over"); });
 
   // ---------- CSV parsing ----------
   function parseCSV(text, delim) {
@@ -601,9 +649,8 @@
     for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
     return out;
   }
-  function encodeItems(items) {
-    var slim = items.map(function (it) { return { d: it.d, n: it.n, c: it.c }; });
-    var json = JSON.stringify({ v: 1, items: slim });
+  function encodeObj(obj) {
+    var json = JSON.stringify(obj);
     var raw = new TextEncoder().encode(json);
     if (typeof CompressionStream !== "undefined") {
       var cs = new CompressionStream("deflate-raw");
@@ -614,7 +661,11 @@
     }
     return Promise.resolve("KK0." + b64urlFromBytes(raw));
   }
-  function decodeItems(code) {
+  function encodeItems(items, name) {
+    var slim = items.map(function (it) { return { d: it.d, n: it.n, c: it.c }; });
+    return encodeObj({ v: 2, name: name, items: slim });
+  }
+  function decodeObj(code) {
     code = code.trim().replace(/\s+/g, "");
     var m = code.match(/KK([01])\.([A-Za-z0-9_-]+)/);
     if (!m) return Promise.reject(new Error("bad"));
@@ -630,8 +681,11 @@
     }
     return p.then(function (json) {
       var obj = JSON.parse(json);
-      if (!obj || !Array.isArray(obj.items) || !obj.items.length) throw new Error("empty");
-      return obj.items;
+      if (!obj) throw new Error("empty");
+      if (obj.close) return obj;
+      if (!Array.isArray(obj.items) || !obj.items.length) throw new Error("empty");
+      if (!obj.name) obj.name = "Abrechnung";
+      return obj;
     });
   }
 
@@ -721,13 +775,24 @@
     rd.readAsText(f, "utf-8");
   });
 
+  function stmtNameValue() { return $("stmtName").value.trim(); }
   function ensureCode() {
     if (currentCode) return Promise.resolve(currentCode);
-    return encodeItems(activeItems()).then(function (c) {
+    return encodeItems(activeItems(), stmtNameValue()).then(function (c) {
       currentCode = c;
       return c;
     });
   }
+  function requireName() {
+    if (stmtNameValue()) return true;
+    toast("Bitte zuerst einen Namen für die Abrechnung eingeben (z. B. Juni)");
+    $("stmtName").focus();
+    return false;
+  }
+  $("stmtName").addEventListener("input", function () {
+    currentCode = null;
+    $("codeOut").hidden = true;
+  });
   function showCodeFallback(code) {
     var out = $("codeOut");
     out.value = code;
@@ -737,9 +802,9 @@
     toast("Code markiert – manuell kopieren");
   }
   $("shareCodeBtn").addEventListener("click", function () {
-    if (!activeItems().length) return;
+    if (!activeItems().length || !requireName()) return;
     ensureCode().then(function (code) {
-      var text = "Code für die neue Abrechnung:\n\n" + code;
+      var text = "Code für Abrechnung „" + stmtNameValue() + "“:\n\n" + code;
       if (navigator.share) {
         navigator.share({ text: text }).catch(function () {});
       } else {
@@ -748,7 +813,7 @@
     });
   });
   $("copyCodeBtn").addEventListener("click", function () {
-    if (!activeItems().length) return;
+    if (!activeItems().length || !requireName()) return;
     ensureCode().then(function (code) {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(code).then(
@@ -760,42 +825,85 @@
   });
   $("swipeHereBtn").addEventListener("click", function () {
     var items = activeItems();
-    if (items.length) startSession(items);
+    if (!items.length || !requireName()) return;
+    var res = mergeStatement(stmtNameValue(), items);
+    setCur(res.id);
+    show(openCount(state) > 0 ? "swipe" : "done");
   });
 
-  // ---------- Vanessa load ----------
-  $("loadCodeBtn").addEventListener("click", function () {
-    var code = $("codeIn").value;
-    if (!code.trim()) { toast("Bitte zuerst den Code einfügen"); return; }
-    load();
-    if (state && state.items && state.items.length && state.decisions.indexOf(null) !== -1) {
-      if (!confirm("Es gibt noch eine angefangene Abrechnung. Neuen Code laden und die alte verwerfen?")) return;
+  // ---------- Lösch-Code (Michi) ----------
+  $("closeCodeBtn").addEventListener("click", function () {
+    var name = $("closeName").value.trim();
+    if (!name) {
+      toast("Bitte den Namen der Abrechnung eingeben");
+      $("closeName").focus();
+      return;
     }
-    decodeItems(code).then(function (items) {
-      $("codeIn").value = "";
-      startSession(items);
-    }).catch(function () {
-      toast("Code ungültig – bitte komplett kopieren und erneut einfügen");
+    encodeObj({ v: 2, close: name }).then(function (code) {
+      var text = "Lösch-Code für Abrechnung „" + name + "“ – Einfügen beendet sie endgültig:\n\n" + code;
+      if (navigator.share) {
+        navigator.share({ text: text }).catch(function () {});
+      } else if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(
+          function () { toast("Lösch-Code kopiert"); },
+          function () { showCodeFallback(code); }
+        );
+      } else showCodeFallback(code);
     });
   });
 
-  function startSession(items) {
-    state = {
-      items: items.map(function (it) { return { d: it.d, n: it.n, c: it.c }; }),
-      decisions: items.map(function () { return null; }),
-      notes: items.map(function () { return ""; })
-    };
+  // ---------- Vanessa: Übersicht & Merge ----------
+  function keyOf(it) { return it.d + "|" + it.n + "|" + it.c; }
+  function mergeStatement(name, items) {
+    var id = normId(name);
+    var st = db.statements[id];
+    if (!st) {
+      st = { name: name.trim(), items: [], decisions: [], notes: [], cleared: false };
+      db.statements[id] = st;
+    }
+    var counts = {};
+    st.items.forEach(function (it) {
+      var k = keyOf(it);
+      counts[k] = (counts[k] || 0) + 1;
+    });
+    var added = 0, moved = 0;
+    items.forEach(function (it) {
+      var k = keyOf(it);
+      if (counts[k] > 0) { counts[k]--; return; }   // schon vorhanden
+      var mv = null;
+      Object.keys(db.statements).some(function (oid) {
+        if (oid === id) return false;
+        var o = db.statements[oid];
+        for (var j = 0; j < o.items.length; j++) {
+          if (keyOf(o.items[j]) === k) {
+            mv = { it: o.items[j], dec: o.decisions[j], note: (o.notes && o.notes[j]) || "" };
+            o.items.splice(j, 1);
+            o.decisions.splice(j, 1);
+            if (o.notes) o.notes.splice(j, 1);
+            if (!o.items.length) delete db.statements[oid];
+            return true;
+          }
+        }
+        return false;
+      });
+      if (mv) {
+        st.items.push(mv.it); st.decisions.push(mv.dec); st.notes.push(mv.note);
+        moved++;
+      } else {
+        st.items.push({ d: it.d, n: it.n, c: it.c });
+        st.decisions.push(null); st.notes.push("");
+        added++;
+      }
+    });
+    if (st.decisions.indexOf(null) !== -1) st.cleared = false;
     save();
-    show("swipe");
+    return { id: id, added: added, moved: moved };
   }
-
-  // ---------- Swipe ----------
-  function nextIndex() { return state.decisions.indexOf(null); }
-  function totals() {
+  function totalsOf(s) {
     var t = { ich: 0, mama: 0, nIch: 0, nMama: 0 };
-    state.decisions.forEach(function (d, i) {
-      if (d === "ich") { t.ich += state.items[i].c; t.nIch++; }
-      else if (d === "mama") { t.mama += state.items[i].c; t.nMama++; }
+    s.decisions.forEach(function (d, i) {
+      if (d === "ich") { t.ich += s.items[i].c; t.nIch++; }
+      else if (d === "mama") { t.mama += s.items[i].c; t.nMama++; }
       else if (d && d.s) {
         t.ich += d.s[0]; t.mama += d.s[1];
         if (d.s[0] !== 0) t.nIch++;
@@ -804,6 +912,69 @@
     });
     return t;
   }
+  function renderOverview() {
+    var wrap = $("stmtList");
+    wrap.innerHTML = "";
+    var ids = Object.keys(db.statements);
+    $("noStmts").textContent = ids.length
+      ? "Wähle eine Abrechnung – oder füge unten einen neuen Code von Michi ein."
+      : "Füge den Code ein, den Michi dir geschickt hat. Danach kannst du jederzeit weiterswipen – der Stand wird auf deinem Handy gespeichert.";
+    ids.sort(function (a, b) { return db.statements[a].name.localeCompare(db.statements[b].name); });
+    ids.forEach(function (id) {
+      var s = db.statements[id];
+      var open = openCount(s);
+      var t = totalsOf(s);
+      var b = document.createElement("button");
+      b.className = "stmt" + (open === 0 && s.cleared ? " cleared" : "");
+      b.innerHTML = '<span class="s-name rounded"></span><span class="s-status"></span><span class="s-sums"></span>';
+      b.querySelector(".s-name").textContent = s.name;
+      b.querySelector(".s-status").textContent = open > 0
+        ? open + " von " + s.items.length + " noch offen"
+        : (s.cleared ? "Geklärt ✓ – wartet auf Michis Lösch-Code" : "Alles zugeordnet – noch nicht geklärt");
+      b.querySelector(".s-sums").textContent = "Mama " + euro(t.mama) + " · Ich " + euro(t.ich);
+      b.addEventListener("click", function () {
+        setCur(id);
+        show(open > 0 ? "swipe" : "done");
+      });
+      wrap.appendChild(b);
+    });
+  }
+  $("loadCodeBtn").addEventListener("click", function () {
+    var code = $("codeIn").value;
+    if (!code.trim()) { toast("Bitte zuerst den Code einfügen"); return; }
+    decodeObj(code).then(function (obj) {
+      $("codeIn").value = "";
+      if (obj.close) {
+        var id = normId(obj.close);
+        if (!db.statements[id]) {
+          toast("Keine Abrechnung namens „" + obj.close + "“ gefunden");
+          return;
+        }
+        if (!confirm("Abrechnung „" + db.statements[id].name + "“ endgültig beenden und alle Daten löschen?")) return;
+        delete db.statements[id];
+        save();
+        renderOverview();
+        toast("Abrechnung beendet und gelöscht ✓");
+        return;
+      }
+      var res = mergeStatement(obj.name, obj.items);
+      var msg = "„" + obj.name + "“: " + res.added + " neue Positionen";
+      if (res.moved) msg += " · " + res.moved + " aus anderer Abrechnung übernommen";
+      if (!res.added && !res.moved) msg = "„" + obj.name + "“: keine neuen Positionen";
+      toast(msg);
+      renderOverview();
+      if (res.added > 0) {
+        setCur(res.id);
+        show("swipe");
+      }
+    }).catch(function () {
+      toast("Code ungültig – bitte komplett kopieren und erneut einfügen");
+    });
+  });
+
+  // ---------- Swipe ----------
+  function nextIndex() { return state.decisions.indexOf(null); }
+  function totals() { return totalsOf(state); }
   function updateSwipeHeader() {
     var t = totals();
     $("chipIch").textContent = euro(t.ich);
@@ -997,7 +1168,7 @@
 
   function resultText() {
     var t = totals();
-    return "Ergebnis der Abrechnung\n" +
+    return "Ergebnis der Abrechnung „" + state.name + "“\n" +
       "Mama: " + euro(t.mama) + " (" + t.nMama + " Positionen)\n" +
       "Ich (Vanessa): " + euro(t.ich) + " (" + t.nIch + " Positionen)";
   }
@@ -1039,7 +1210,7 @@
       cur = "";
       y = 800;
       if (first) {
-        cur += pdfText(40, y, "F2", 16, "Abrechnung – Ergebnis");
+        cur += pdfText(40, y, "F2", 16, "Abrechnung „" + state.name + "“ – Ergebnis");
         y -= 16;
         cur += pdfText(40, y, "F1", 9, "Erstellt am " + new Date().toLocaleDateString("de-DE"));
         y -= 24;
@@ -1123,7 +1294,7 @@
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
     a.href = url;
-    a.download = "abrechnung-ergebnis.pdf";
+    a.download = "abrechnung-" + state.name.toLowerCase().replace(/[^a-z0-9äöüß]+/gi, "-") + ".pdf";
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -1131,13 +1302,15 @@
     toast("PDF wird gespeichert");
   });
   $("clearBtn").addEventListener("click", function () {
-    if (!confirm("Wirklich alles löschen? Die Zuordnung und alle Transaktionen werden von diesem Gerät entfernt.")) return;
-    wipe();
-    toast("Alles gelöscht ✓");
-    show("home");
+    if (!confirm("Abrechnung „" + state.name + "“ als geklärt markieren?")) return;
+    state.cleared = true;
+    save();
+    toast("Als geklärt markiert ✓");
+    show("over");
   });
 
   // ---------- boot ----------
+  loadDb();
   var unlocked = false;
   try { unlocked = localStorage.getItem(LS_UNLOCK) === PIN_HASH; } catch (e) {}
   show(unlocked ? "home" : "lock");
