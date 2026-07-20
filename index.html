@@ -1410,7 +1410,8 @@
         });
       }
       y -= 4;
-      infoLine("Gesamtsumme der Abrechnung (inkl. Übersprungene): " + fmt(t.mama + t.ich + skipSum), "F2", 10);
+      infoLine("Gesamtsumme exkl. Übersprungene (Mama + " + ownerDisplay + "): " + fmt(t.mama + t.ich), "F2", 10);
+      infoLine("Gesamtsumme inkl. Übersprungene: " + fmt(t.mama + t.ich + skipSum), "F2", 10);
     }
     pages.push(cur);
 
