@@ -169,6 +169,15 @@
   .stmt .s-sums { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
   .sect-label { font-size: 13px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); margin: 10px 0 0; }
+  .chkrow { display: flex; align-items: center; gap: 10px; font-size: 14.5px; cursor: pointer; }
+  .chkrow input { width: 20px; height: 20px; accent-color: var(--ich); margin: 0; }
+  .s-final {
+    display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 1px;
+    color: var(--mama); border: 1.5px solid var(--mama); border-radius: 6px;
+    padding: 1px 6px; margin-left: 8px; vertical-align: 2px;
+  }
+  .pdfrow { display: flex; gap: 10px; }
+  .pdfrow .btn { flex: 1; }
 
   textarea.code {
     width: 100%; min-height: 110px; resize: vertical;
@@ -332,6 +341,7 @@
     <p class="sub">Lade die CSV-Datei aus dem Amex-Konto hoch – auch mehrmals im Monat: Vanessa bekommt automatisch nur die neuen Positionen. Die CSV wird nur hier im Browser gelesen und nirgendwohin übertragen.</p>
     <div class="stack">
       <input class="text" id="stmtName" placeholder="Name der Abrechnung, z. B. Juni" maxlength="30">
+      <label class="chkrow"><input type="checkbox" id="finalChk"> Finale Abrechnung des Monats</label>
       <label class="filelabel" for="csvFile">
         <strong>CSV auswählen</strong>
         Amex-Export (Datum, Beschreibung, Betrag)
@@ -415,7 +425,10 @@
         <div class="moveHint">Tippen = zu „Mama“ verschieben</div>
       </details>
       <button class="btn" id="shareResultBtn">Ergebnis senden</button>
-      <button class="btn secondary" id="saveResultBtn">Als PDF speichern</button>
+      <div class="pdfrow">
+        <button class="btn secondary" id="pdfMamaBtn">PDF Mama</button>
+        <button class="btn secondary" id="pdfIchBtn">PDF Vanessa</button>
+      </div>
       <button class="btn danger" id="clearBtn">Geklärt ✓</button>
       <p class="hint">„Geklärt“ markiert die Abrechnung als erledigt – sie bleibt aber gespeichert, bis Michi sie mit einem Lösch-Code endgültig beendet. Tauchen später neue Positionen auf, öffnet sie sich automatisch wieder.</p>
     </div>
@@ -508,7 +521,9 @@
       lock: "KK", home: "KK", michi: "Michi · Admin", over: "Vanessa",
       swipe: "Zuordnen", done: "Ergebnis"
     }[name];
-    if ((name === "swipe" || name === "done") && state) title = state.name;
+    if ((name === "swipe" || name === "done") && state) {
+      title = state.name + (state.fin ? " · Final" : "");
+    }
     $("barTitle").textContent = title;
     if (name === "over") renderOverview();
     if (name === "swipe") renderDeck();
@@ -661,9 +676,11 @@
     }
     return Promise.resolve("KK0." + b64urlFromBytes(raw));
   }
-  function encodeItems(items, name) {
+  function encodeItems(items, name, fin) {
     var slim = items.map(function (it) { return { d: it.d, n: it.n, c: it.c }; });
-    return encodeObj({ v: 2, name: name, items: slim });
+    var obj = { v: 2, name: name, items: slim };
+    if (fin) obj.fin = 1;
+    return encodeObj(obj);
   }
   function decodeObj(code) {
     code = code.trim().replace(/\s+/g, "");
@@ -778,11 +795,15 @@
   function stmtNameValue() { return $("stmtName").value.trim(); }
   function ensureCode() {
     if (currentCode) return Promise.resolve(currentCode);
-    return encodeItems(activeItems(), stmtNameValue()).then(function (c) {
+    return encodeItems(activeItems(), stmtNameValue(), $("finalChk").checked).then(function (c) {
       currentCode = c;
       return c;
     });
   }
+  $("finalChk").addEventListener("change", function () {
+    currentCode = null;
+    $("codeOut").hidden = true;
+  });
   function requireName() {
     if (stmtNameValue()) return true;
     toast("Bitte zuerst einen Namen für die Abrechnung eingeben (z. B. Juni)");
@@ -804,7 +825,7 @@
   $("shareCodeBtn").addEventListener("click", function () {
     if (!activeItems().length || !requireName()) return;
     ensureCode().then(function (code) {
-      var text = "Code für Abrechnung „" + stmtNameValue() + "“:\n\n" + code;
+      var text = "Code für Abrechnung „" + stmtNameValue() + "“" + ($("finalChk").checked ? " (FINAL)" : "") + ":\n\n" + code;
       if (navigator.share) {
         navigator.share({ text: text }).catch(function () {});
       } else {
@@ -826,7 +847,7 @@
   $("swipeHereBtn").addEventListener("click", function () {
     var items = activeItems();
     if (!items.length || !requireName()) return;
-    var res = mergeStatement(stmtNameValue(), items);
+    var res = mergeStatement(stmtNameValue(), items, $("finalChk").checked);
     setCur(res.id);
     show(openCount(state) > 0 ? "swipe" : "done");
   });
@@ -854,13 +875,14 @@
 
   // ---------- Vanessa: Übersicht & Merge ----------
   function keyOf(it) { return it.d + "|" + it.n + "|" + it.c; }
-  function mergeStatement(name, items) {
+  function mergeStatement(name, items, fin) {
     var id = normId(name);
     var st = db.statements[id];
     if (!st) {
       st = { name: name.trim(), items: [], decisions: [], notes: [], cleared: false };
       db.statements[id] = st;
     }
+    if (fin) st.fin = true;
     var counts = {};
     st.items.forEach(function (it) {
       var k = keyOf(it);
@@ -928,6 +950,12 @@
       b.className = "stmt" + (open === 0 && s.cleared ? " cleared" : "");
       b.innerHTML = '<span class="s-name rounded"></span><span class="s-status"></span><span class="s-sums"></span>';
       b.querySelector(".s-name").textContent = s.name;
+      if (s.fin) {
+        var badge = document.createElement("span");
+        badge.className = "s-final";
+        badge.textContent = "FINAL";
+        b.querySelector(".s-name").appendChild(badge);
+      }
       b.querySelector(".s-status").textContent = open > 0
         ? open + " von " + s.items.length + " noch offen"
         : (s.cleared ? "Geklärt ✓ – wartet auf Michis Lösch-Code" : "Alles zugeordnet – noch nicht geklärt");
@@ -957,8 +985,8 @@
         toast("Abrechnung beendet und gelöscht ✓");
         return;
       }
-      var res = mergeStatement(obj.name, obj.items);
-      var msg = "„" + obj.name + "“: " + res.added + " neue Positionen";
+      var res = mergeStatement(obj.name, obj.items, obj.fin);
+      var msg = "„" + obj.name + "“" + (obj.fin ? " (final)" : "") + ": " + res.added + " neue Positionen";
       if (res.moved) msg += " · " + res.moved + " aus anderer Abrechnung übernommen";
       if (!res.added && !res.moved) msg = "„" + obj.name + "“: keine neuen Positionen";
       toast(msg);
@@ -1189,36 +1217,39 @@
   function pdfText(x, y, font, size, txt) {
     return "BT /" + font + " " + size + " Tf " + x + " " + y + " Td (" + pdfEsc(txt) + ") Tj ET\n";
   }
-  function buildPDF() {
+  function buildPDF(who) {
+    var personName = who === "ich" ? "Vanessa" : "Mama";
     var rows = [];
     state.decisions.forEach(function (d, i) {
       var it = state.items[i];
       var note = noteAt(i);
       function amt(c) { return (c / 100).toFixed(2).replace(".", ",") + " €"; }
-      var desc = it.n.length > 46 ? it.n.slice(0, 45) + "…" : it.n;
+      var desc = it.n.length > 52 ? it.n.slice(0, 51) + "…" : it.n;
       if (d === "ich" || d === "mama") {
-        rows.push({ d: it.d, n: desc, a: amt(it.c), w: d === "ich" ? "Vanessa" : "Mama", note: note });
+        if (d !== who) return;
+        rows.push({ d: it.d, n: desc, a: amt(it.c), note: note });
       } else if (d && d.s) {
-        if (d.s[0] !== 0) rows.push({ d: it.d, n: desc + " (Anteil)", a: amt(d.s[0]), w: "Vanessa", note: note });
-        if (d.s[1] !== 0) rows.push({ d: it.d, n: desc + " (Anteil)", a: amt(d.s[1]), w: "Mama", note: d.s[0] !== 0 ? "" : note });
+        var part = who === "ich" ? d.s[0] : d.s[1];
+        if (part === 0) return;
+        rows.push({ d: it.d, n: desc + " (Anteil)", a: amt(part), note: note });
       }
     });
     var t = totals();
+    var ownSum = who === "ich" ? t.ich : t.mama;
     var pages = [], cur = "", y = 0;
     function newPage(first) {
       if (cur) pages.push(cur);
       cur = "";
       y = 800;
       if (first) {
-        cur += pdfText(40, y, "F2", 16, "Abrechnung „" + state.name + "“ – Ergebnis");
+        cur += pdfText(40, y, "F2", 16, "Abrechnung „" + state.name + "“ – " + personName + (state.fin ? " (final)" : ""));
         y -= 16;
         cur += pdfText(40, y, "F1", 9, "Erstellt am " + new Date().toLocaleDateString("de-DE"));
         y -= 24;
       }
       cur += pdfText(40, y, "F2", 9, "Datum");
       cur += pdfText(105, y, "F2", 9, "Beschreibung");
-      cur += pdfText(400, y, "F2", 9, "Betrag");
-      cur += pdfText(470, y, "F2", 9, "Wer");
+      cur += pdfText(460, y, "F2", 9, "Betrag");
       y -= 6;
       cur += "0.7 w 40 " + y + " m 555 " + y + " l S\n";
       y -= 14;
@@ -1229,8 +1260,7 @@
       if (y - need < 70) newPage(false);
       cur += pdfText(40, y, "F1", 9, r.d);
       cur += pdfText(105, y, "F1", 9, r.n);
-      cur += pdfText(400, y, "F1", 9, r.a);
-      cur += pdfText(470, y, "F1", 9, r.w);
+      cur += pdfText(460, y, "F1", 9, r.a);
       y -= 13;
       if (r.note) {
         cur += pdfText(105, y, "F3", 8, "Kommentar: " + r.note);
@@ -1241,9 +1271,7 @@
     y -= 6;
     cur += "0.7 w 40 " + y + " m 555 " + y + " l S\n";
     y -= 18;
-    cur += pdfText(40, y, "F2", 11, "Summe Mama: " + (t.mama / 100).toFixed(2).replace(".", ",") + " € (" + t.nMama + " Positionen)");
-    y -= 16;
-    cur += pdfText(40, y, "F2", 11, "Summe Vanessa: " + (t.ich / 100).toFixed(2).replace(".", ",") + " € (" + t.nIch + " Positionen)");
+    cur += pdfText(40, y, "F2", 11, "Summe " + personName + ": " + (ownSum / 100).toFixed(2).replace(".", ",") + " € (" + rows.length + " Positionen)");
     pages.push(cur);
 
     var objs = [];
@@ -1289,18 +1317,21 @@
       );
     } else toast(text);
   });
-  $("saveResultBtn").addEventListener("click", function () {
-    var blob = new Blob([buildPDF()], { type: "application/pdf" });
+  function downloadPDF(who) {
+    var personName = who === "ich" ? "vanessa" : "mama";
+    var blob = new Blob([buildPDF(who)], { type: "application/pdf" });
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
     a.href = url;
-    a.download = "abrechnung-" + state.name.toLowerCase().replace(/[^a-z0-9äöüß]+/gi, "-") + ".pdf";
+    a.download = "abrechnung-" + state.name.toLowerCase().replace(/[^a-z0-9äöüß]+/gi, "-") + "-" + personName + ".pdf";
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
     toast("PDF wird gespeichert");
-  });
+  }
+  $("pdfMamaBtn").addEventListener("click", function () { downloadPDF("mama"); });
+  $("pdfIchBtn").addEventListener("click", function () { downloadPDF("ich"); });
   $("clearBtn").addEventListener("click", function () {
     if (!confirm("Abrechnung „" + state.name + "“ als geklärt markieren?")) return;
     state.cleared = true;
