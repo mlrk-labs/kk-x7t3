@@ -362,7 +362,7 @@
         <div class="kv"><span>Positionen</span><span class="v" id="pCount">–</span></div>
         <div class="kv"><span>Summe</span><span class="v" id="pSum">–</span></div>
         <div class="kv" id="pCreditRow" hidden><span>davon Gutschriften</span><span class="v" id="pCredits">–</span></div>
-        <div class="kv" id="pSkipRow" hidden><span>aussortiert (andere Karteninhaber)</span><span class="v" id="pSkipped">–</span></div>
+        <div class="kv" id="pSkipRow" hidden><span id="pSkipLabel">aussortiert (andere Karteninhaber)</span><span class="v" id="pSkipped">–</span></div>
       </div>
       <button class="btn" id="shareCodeBtn" disabled>Code senden</button>
       <button class="btn secondary" id="copyCodeBtn" disabled>Code kopieren</button>
@@ -425,7 +425,8 @@
       <div class="card-panel">
         <div class="kv"><span>Ausgaben gesamt (ohne Gutschriften)</span><span class="v" id="sGross">–</span></div>
         <div class="kv"><span>Gutschriften</span><span class="v" id="sCredit">–</span></div>
-        <div class="kv"><span>Saldo gesamt (mit Gutschriften)</span><span class="v" id="sNet">–</span></div>
+        <div class="kv"><span id="sNetLabel">Saldo gesamt (mit Gutschriften)</span><span class="v" id="sNet">–</span></div>
+        <div id="extraSaldi"></div>
         <div class="kv" id="sSkipRow" hidden><span>Übersprungen (zählt nirgends)</span><span class="v" id="sSkip">–</span></div>
       </div>
       <details class="plist" id="listMamaWrap">
@@ -707,10 +708,11 @@
     }
     return Promise.resolve("KK0." + b64urlFromBytes(raw));
   }
-  function encodeItems(items, name, fin, owner) {
+  function encodeItems(items, name, fin, owner, others) {
     var slim = items.map(function (it) { return { d: it.d, n: it.n, c: it.c }; });
     var obj = { v: 2, name: name, items: slim, o: owner };
     if (fin) obj.fin = 1;
+    if (others) obj.x = others;
     return encodeObj(obj);
   }
   function decodeObj(code) {
@@ -783,6 +785,9 @@
       if (it.c < 0) { credits += it.c; creditCount++; }
     });
     var skipped = parsedAll.length - items.length;
+    $("pSkipLabel").textContent = michiMode()
+      ? "weitere Karteninhaber (reisen als Info mit)"
+      : "aussortiert (andere Karteninhaber)";
     $("pCount").textContent = items.length;
     $("pSum").textContent = euro(sum);
     $("pCreditRow").hidden = creditCount === 0;
@@ -836,9 +841,22 @@
     if (holderNames.length === 1) return ownerFromHolder(holderNames[0]);
     return "Vanessa";
   }
+  function michiMode() {
+    return holderNames.length > 1 && !!selectedHolder && ownerFromHolder(selectedHolder) === "Michi";
+  }
+  function othersItems() {
+    if (!parsedAll || !michiMode()) return null;
+    var arr = [];
+    parsedAll.forEach(function (it) {
+      if (it.h === selectedHolder) return;
+      if (isPayment(it)) return;
+      arr.push({ d: it.d, n: it.n, c: it.c, h: ownerFromHolder(it.h) });
+    });
+    return arr.length ? arr : null;
+  }
   function ensureCode() {
     if (currentCode) return Promise.resolve(currentCode);
-    return encodeItems(activeItems(), stmtNameValue(), $("finalChk").checked, uploadOwner()).then(function (c) {
+    return encodeItems(activeItems(), stmtNameValue(), $("finalChk").checked, uploadOwner(), othersItems()).then(function (c) {
       currentCode = c;
       return c;
     });
@@ -890,7 +908,7 @@
   $("swipeHereBtn").addEventListener("click", function () {
     var items = activeItems();
     if (!items.length || !requireName()) return;
-    var res = mergeStatement(stmtNameValue(), items, $("finalChk").checked, uploadOwner());
+    var res = mergeStatement(stmtNameValue(), items, $("finalChk").checked, uploadOwner(), othersItems());
     setCur(res.id);
     show(openCount(state) > 0 ? "swipe" : "done");
   });
@@ -918,7 +936,7 @@
 
   // ---------- Vanessa: Übersicht & Merge ----------
   function keyOf(it) { return it.d + "|" + it.n + "|" + it.c; }
-  function mergeStatement(name, items, fin, owner) {
+  function mergeStatement(name, items, fin, owner, others) {
     var id = normId(name);
     var st = db.statements[id];
     if (!st) {
@@ -928,6 +946,7 @@
     if (fin) st.fin = true;
     if (owner && !st.owner) st.owner = owner;
     if (!st.owner) st.owner = "Vanessa";
+    if (others) st.others = others;   // Info-Umsätze anderer Karteninhaber, wird bei jedem Upload ersetzt
     var counts = {};
     st.items.forEach(function (it) {
       var k = keyOf(it);
@@ -1032,7 +1051,7 @@
         toast("Abrechnung beendet und gelöscht ✓");
         return;
       }
-      var res = mergeStatement(obj.name, obj.items, obj.fin, obj.o);
+      var res = mergeStatement(obj.name, obj.items, obj.fin, obj.o, obj.x);
       var msg = "„" + obj.name + "“" + (obj.fin ? " (final)" : "") + ": " + res.added + " neue Positionen";
       if (res.auto) msg += " · " + res.auto + " Zahlung(en) automatisch übersprungen";
       if (res.moved) msg += " · " + res.moved + " aus anderer Abrechnung übernommen";
@@ -1216,6 +1235,33 @@
     $("sGross").textContent = euro(gross);
     $("sCredit").textContent = euro(credit);
     $("sNet").textContent = euro(gross + credit);
+    var others = state.others || [];
+    $("sNetLabel").textContent = others.length
+      ? "Saldo gesamt " + (state.owner || "") + " (mit Gutschriften)"
+      : "Saldo gesamt (mit Gutschriften)";
+    var ex = $("extraSaldi");
+    ex.innerHTML = "";
+    if (others.length) {
+      var byName = {};
+      others.forEach(function (o) {
+        byName[o.h || "Andere"] = (byName[o.h || "Andere"] || 0) + o.c;
+      });
+      var allSum = gross + credit;
+      Object.keys(byName).forEach(function (nm) {
+        allSum += byName[nm];
+        var row = document.createElement("div");
+        row.className = "kv";
+        row.innerHTML = '<span></span><span class="v"></span>';
+        row.firstElementChild.textContent = "Saldo " + nm;
+        row.lastElementChild.textContent = euro(byName[nm]);
+        ex.appendChild(row);
+      });
+      var rowT = document.createElement("div");
+      rowT.className = "kv";
+      rowT.innerHTML = '<span style="font-weight:700">Saldo gesamt</span><span class="v"></span>';
+      rowT.lastElementChild.textContent = euro(allSum);
+      ex.appendChild(rowT);
+    }
     $("sSkipRow").hidden = skipCount === 0;
     $("sSkip").textContent = skipCount + " · " + euro(skipSum);
     $("listSkipWrap").hidden = skipCount === 0;
