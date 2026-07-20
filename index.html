@@ -1458,6 +1458,21 @@
       y -= 4;
       infoLine("Gesamtsumme exkl. Übersprungene (Mama + " + ownerDisplay + "): " + fmt(t.mama + t.ich), "F2", 10);
       infoLine("Gesamtsumme inkl. Übersprungene: " + fmt(t.mama + t.ich + skipSum), "F2", 10);
+      var others = state.others || [];
+      if (others.length) {
+        var byName = {}, othersSum = 0;
+        others.forEach(function (o) {
+          var nm = o.h || "Andere";
+          byName[nm] = (byName[nm] || 0) + o.c;
+          othersSum += o.c;
+        });
+        y -= 8;
+        Object.keys(byName).forEach(function (nm) {
+          infoLine("Saldo " + nm + " (weitere Karte, nur Info): " + fmt(byName[nm]), "F1", 9);
+        });
+        y -= 4;
+        infoLine("Gesamtsumme alle Karten – voraussichtliche Amex-Abbuchung: " + fmt(t.mama + t.ich + othersSum), "F2", 11);
+      }
     }
     pages.push(cur);
 
