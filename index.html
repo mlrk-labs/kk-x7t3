@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#F5F4EF" media="(prefers-color-scheme: light)">
@@ -54,7 +54,9 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     overscroll-behavior-y: none;
+    touch-action: manipulation;
   }
+  button { touch-action: manipulation; }
   .rounded { font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif; }
 
   .app {
@@ -225,6 +227,12 @@
   .act.mama-btn { color: var(--mama); border-color: var(--mama); background: var(--mama-soft); }
   .act.ich-btn { color: var(--ich); border-color: var(--ich); background: var(--ich-soft); }
   .swipe-legend { text-align: center; color: var(--muted); font-size: 13px; padding-bottom: 4px; }
+  .extra-actions { display: flex; justify-content: center; gap: 4px; }
+  .extra-actions .btn.ghost { width: auto; }
+  .tcard .tnote {
+    align-self: center; margin-top: 4px; font-size: 13px; font-style: italic;
+    color: var(--muted); overflow-wrap: anywhere;
+  }
 
   @media (prefers-reduced-motion: reduce) {
     .tcard, .progress i, .toast { transition: none !important; }
@@ -252,12 +260,15 @@
   details.plist summary::-webkit-details-marker { display: none; }
   .plist ul { list-style: none; margin: 0; padding: 0 8px 8px; }
   .plist li {
-    display: flex; gap: 10px; align-items: center; padding: 10px 8px;
+    display: block; padding: 10px 8px;
     border-top: 1px solid var(--line); font-size: 14px; cursor: pointer; border-radius: 8px;
   }
+  .plist li .row { display: flex; gap: 10px; align-items: center; }
   .plist li .d { color: var(--muted); flex: none; font-variant-numeric: tabular-nums; font-size: 12.5px; }
   .plist li .n { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .plist li .a { font-variant-numeric: tabular-nums; font-weight: 700; flex: none; }
+  .plist li .nb { flex: none; opacity: .55; padding: 0 2px; }
+  .plist li .note { color: var(--muted); font-size: 12.5px; font-style: italic; margin-top: 3px; overflow-wrap: anywhere; }
   .plist .moveHint { font-size: 12px; color: var(--muted); padding: 6px 16px 12px; }
 </style>
 </head>
@@ -348,6 +359,10 @@
       <button class="act small" id="btnUndo" aria-label="Rückgängig">↩</button>
       <button class="act big ich-btn rounded" id="btnIch" aria-label="Mir zuordnen">Ich</button>
     </div>
+    <div class="extra-actions">
+      <button class="btn ghost" id="btnNote">💬 Kommentar</button>
+      <button class="btn ghost" id="btnSplit">⑂ Betrag aufteilen</button>
+    </div>
     <div class="swipe-legend">← links wischen: Mama &nbsp;·&nbsp; rechts wischen: Ich →</div>
   </section>
 
@@ -371,7 +386,7 @@
         <div class="moveHint">Tippen = zu „Mama“ verschieben</div>
       </details>
       <button class="btn" id="shareResultBtn">Ergebnis senden</button>
-      <button class="btn secondary" id="saveResultBtn">Als CSV speichern</button>
+      <button class="btn secondary" id="saveResultBtn">Als PDF speichern</button>
       <button class="btn danger" id="clearBtn">Geklärt ✓ – Daten löschen</button>
       <p class="hint">„Geklärt“ löscht alle Transaktionsdaten endgültig von diesem Gerät.</p>
     </div>
@@ -467,6 +482,9 @@
   $("pickMichi").addEventListener("click", function () { show("michi"); });
   $("pickVanessa").addEventListener("click", function () {
     load();
+    if (state && state.items && !state.notes) {
+      state.notes = state.items.map(function () { return ""; });
+    }
     if (state && state.items && state.items.length) {
       var open = state.decisions.indexOf(null);
       show(open === -1 ? "done" : "swipe");
@@ -749,6 +767,10 @@
   $("loadCodeBtn").addEventListener("click", function () {
     var code = $("codeIn").value;
     if (!code.trim()) { toast("Bitte zuerst den Code einfügen"); return; }
+    load();
+    if (state && state.items && state.items.length && state.decisions.indexOf(null) !== -1) {
+      if (!confirm("Es gibt noch eine angefangene Abrechnung. Neuen Code laden und die alte verwerfen?")) return;
+    }
     decodeItems(code).then(function (items) {
       $("codeIn").value = "";
       startSession(items);
@@ -760,7 +782,8 @@
   function startSession(items) {
     state = {
       items: items.map(function (it) { return { d: it.d, n: it.n, c: it.c }; }),
-      decisions: items.map(function () { return null; })
+      decisions: items.map(function () { return null; }),
+      notes: items.map(function () { return ""; })
     };
     save();
     show("swipe");
@@ -772,7 +795,12 @@
     var t = { ich: 0, mama: 0, nIch: 0, nMama: 0 };
     state.decisions.forEach(function (d, i) {
       if (d === "ich") { t.ich += state.items[i].c; t.nIch++; }
-      if (d === "mama") { t.mama += state.items[i].c; t.nMama++; }
+      else if (d === "mama") { t.mama += state.items[i].c; t.nMama++; }
+      else if (d && d.s) {
+        t.ich += d.s[0]; t.mama += d.s[1];
+        if (d.s[0] !== 0) t.nIch++;
+        if (d.s[1] !== 0) t.nMama++;
+      }
     });
     return t;
   }
@@ -784,7 +812,7 @@
     $("counter").textContent = done + " / " + state.items.length;
     $("progressBar").style.width = (done / state.items.length * 100) + "%";
   }
-  function buildCard(item) {
+  function buildCard(item, note) {
     var el = document.createElement("div");
     el.className = "tcard";
     el.innerHTML =
@@ -793,10 +821,12 @@
       '<div class="tdate"></div>' +
       '<div class="tamount rounded"></div>' +
       '<div class="tdesc"></div>' +
-      (item.c < 0 ? '<div class="tcredit">Gutschrift</div>' : "");
+      (item.c < 0 ? '<div class="tcredit">Gutschrift</div>' : "") +
+      '<div class="tnote"></div>';
     el.querySelector(".tdate").textContent = item.d;
     el.querySelector(".tamount").textContent = euro(Math.abs(item.c)) + (item.c < 0 ? " −" : "");
     el.querySelector(".tdesc").textContent = item.n;
+    el.querySelector(".tnote").textContent = note ? "💬 " + note : "";
     return el;
   }
   function renderDeck() {
@@ -810,14 +840,15 @@
       if (state.decisions[i] === null) undecided.push(i);
     }
     if (undecided[1] !== undefined) {
-      var behind = buildCard(state.items[undecided[1]]);
+      var behind = buildCard(state.items[undecided[1]], noteAt(undecided[1]));
       behind.classList.add("behind");
       deck.appendChild(behind);
     }
-    var top = buildCard(state.items[undecided[0]]);
+    var top = buildCard(state.items[undecided[0]], noteAt(undecided[0]));
     deck.appendChild(top);
     attachDrag(top, undecided[0]);
   }
+  function noteAt(i) { return (state.notes && state.notes[i]) || ""; }
   function decide(idx, who, el, fromDrag) {
     state.decisions[idx] = who;
     save();
@@ -885,6 +916,39 @@
     renderDeck();
   });
 
+  function editNote(idx, after) {
+    var cur = noteAt(idx);
+    var txt = prompt("Kommentar zu dieser Position:", cur);
+    if (txt === null) return;
+    if (!state.notes) state.notes = state.items.map(function () { return ""; });
+    state.notes[idx] = txt.trim();
+    save();
+    after();
+  }
+  function splitItem(idx, after) {
+    var it = state.items[idx];
+    var inp = prompt(
+      "Gesamt: " + euro(it.c) + "\nWie viel davon gehört zu „Ich“ (Vanessa)?\nBetrag in Euro, z. B. 12,99 – der Rest geht an Mama."
+    );
+    if (inp === null) return;
+    var ich = parseAmount(inp);
+    if (ich === null) { toast("Betrag nicht erkannt"); return; }
+    var ok = it.c >= 0 ? (ich >= 0 && ich <= it.c) : (ich <= 0 && ich >= it.c);
+    if (!ok) { toast("Betrag muss zwischen 0 € und " + euro(it.c) + " liegen"); return; }
+    state.decisions[idx] = { s: [ich, it.c - ich] };
+    save();
+    toast("Aufgeteilt: Ich " + euro(ich) + " · Mama " + euro(it.c - ich));
+    after();
+  }
+  $("btnNote").addEventListener("click", function () {
+    var idx = nextIndex();
+    if (idx !== -1) editNote(idx, renderDeck);
+  });
+  $("btnSplit").addEventListener("click", function () {
+    var idx = nextIndex();
+    if (idx !== -1) splitItem(idx, renderDeck);
+  });
+
   // ---------- Done ----------
   function renderDone() {
     var t = totals();
@@ -898,14 +962,30 @@
       var ul = $(who === "ich" ? "listIch" : "listMama");
       ul.innerHTML = "";
       state.decisions.forEach(function (d, i) {
-        if (d !== who) return;
+        var isSplit = d && d.s;
+        var part = null;
+        if (isSplit) {
+          part = who === "ich" ? d.s[0] : d.s[1];
+          if (part === 0) return;
+        } else if (d !== who) return;
         var it = state.items[i];
         var li = document.createElement("li");
-        li.innerHTML = '<span class="d"></span><span class="n"></span><span class="a"></span>';
+        li.innerHTML =
+          '<div class="row"><span class="d"></span><span class="n"></span>' +
+          '<span class="a"></span><span class="nb" role="button" aria-label="Kommentar">💬</span></div>' +
+          '<div class="note"></div>';
         li.querySelector(".d").textContent = it.d;
-        li.querySelector(".n").textContent = it.n;
-        li.querySelector(".a").textContent = euro(it.c);
+        li.querySelector(".n").textContent = it.n + (isSplit ? " (Anteil)" : "");
+        li.querySelector(".a").textContent = euro(isSplit ? part : it.c);
+        var note = noteAt(i);
+        li.querySelector(".note").textContent = note;
+        li.querySelector(".note").hidden = !note;
+        li.querySelector(".nb").addEventListener("click", function (e) {
+          e.stopPropagation();
+          editNote(i, renderDone);
+        });
         li.addEventListener("click", function () {
+          if (isSplit) { splitItem(i, renderDone); return; }
           state.decisions[i] = who === "ich" ? "mama" : "ich";
           save();
           renderDone();
@@ -921,19 +1001,111 @@
       "Mama: " + euro(t.mama) + " (" + t.nMama + " Positionen)\n" +
       "Ich (Vanessa): " + euro(t.ich) + " (" + t.nIch + " Positionen)";
   }
-  function resultCSV() {
-    var lines = ["Datum;Beschreibung;Betrag;Zuordnung"];
+  // ---------- PDF ----------
+  var WIN_MAP = { 0x20AC: 0x80, 0x201E: 0x84, 0x2026: 0x85, 0x2018: 0x91, 0x2019: 0x92, 0x201C: 0x93, 0x201D: 0x94, 0x2013: 0x96, 0x2014: 0x97 };
+  function pdfEsc(s) {
+    var out = "";
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charCodeAt(i);
+      if (WIN_MAP[c]) c = WIN_MAP[c];
+      if (c > 255) c = 63; // ?
+      var ch = String.fromCharCode(c);
+      if (ch === "\\" || ch === "(" || ch === ")") out += "\\";
+      out += ch;
+    }
+    return out;
+  }
+  function pdfText(x, y, font, size, txt) {
+    return "BT /" + font + " " + size + " Tf " + x + " " + y + " Td (" + pdfEsc(txt) + ") Tj ET\n";
+  }
+  function buildPDF() {
+    var rows = [];
     state.decisions.forEach(function (d, i) {
       var it = state.items[i];
-      lines.push([it.d, '"' + it.n.replace(/"/g, '""') + '"',
-        (it.c / 100).toFixed(2).replace(".", ","),
-        d === "ich" ? "Vanessa" : "Mama"].join(";"));
+      var note = noteAt(i);
+      function amt(c) { return (c / 100).toFixed(2).replace(".", ",") + " €"; }
+      var desc = it.n.length > 46 ? it.n.slice(0, 45) + "…" : it.n;
+      if (d === "ich" || d === "mama") {
+        rows.push({ d: it.d, n: desc, a: amt(it.c), w: d === "ich" ? "Vanessa" : "Mama", note: note });
+      } else if (d && d.s) {
+        if (d.s[0] !== 0) rows.push({ d: it.d, n: desc + " (Anteil)", a: amt(d.s[0]), w: "Vanessa", note: note });
+        if (d.s[1] !== 0) rows.push({ d: it.d, n: desc + " (Anteil)", a: amt(d.s[1]), w: "Mama", note: d.s[0] !== 0 ? "" : note });
+      }
     });
     var t = totals();
-    lines.push("");
-    lines.push("Summe Mama;;" + (t.mama / 100).toFixed(2).replace(".", ",") + ";");
-    lines.push("Summe Vanessa;;" + (t.ich / 100).toFixed(2).replace(".", ",") + ";");
-    return lines.join("\n");
+    var pages = [], cur = "", y = 0;
+    function newPage(first) {
+      if (cur) pages.push(cur);
+      cur = "";
+      y = 800;
+      if (first) {
+        cur += pdfText(40, y, "F2", 16, "Abrechnung – Ergebnis");
+        y -= 16;
+        cur += pdfText(40, y, "F1", 9, "Erstellt am " + new Date().toLocaleDateString("de-DE"));
+        y -= 24;
+      }
+      cur += pdfText(40, y, "F2", 9, "Datum");
+      cur += pdfText(105, y, "F2", 9, "Beschreibung");
+      cur += pdfText(400, y, "F2", 9, "Betrag");
+      cur += pdfText(470, y, "F2", 9, "Wer");
+      y -= 6;
+      cur += "0.7 w 40 " + y + " m 555 " + y + " l S\n";
+      y -= 14;
+    }
+    newPage(true);
+    rows.forEach(function (r) {
+      var need = 13 + (r.note ? 11 : 0);
+      if (y - need < 70) newPage(false);
+      cur += pdfText(40, y, "F1", 9, r.d);
+      cur += pdfText(105, y, "F1", 9, r.n);
+      cur += pdfText(400, y, "F1", 9, r.a);
+      cur += pdfText(470, y, "F1", 9, r.w);
+      y -= 13;
+      if (r.note) {
+        cur += pdfText(105, y, "F3", 8, "Kommentar: " + r.note);
+        y -= 11;
+      }
+    });
+    if (y < 110) newPage(false);
+    y -= 6;
+    cur += "0.7 w 40 " + y + " m 555 " + y + " l S\n";
+    y -= 18;
+    cur += pdfText(40, y, "F2", 11, "Summe Mama: " + (t.mama / 100).toFixed(2).replace(".", ",") + " € (" + t.nMama + " Positionen)");
+    y -= 16;
+    cur += pdfText(40, y, "F2", 11, "Summe Vanessa: " + (t.ich / 100).toFixed(2).replace(".", ",") + " € (" + t.nIch + " Positionen)");
+    pages.push(cur);
+
+    var objs = [];
+    var kids = pages.map(function (_, k) { return (6 + 2 * k) + " 0 R"; });
+    objs[1] = "<< /Type /Catalog /Pages 2 0 R >>";
+    objs[2] = "<< /Type /Pages /Kids [" + kids.join(" ") + "] /Count " + pages.length + " >>";
+    objs[3] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>";
+    objs[4] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>";
+    objs[5] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique /Encoding /WinAnsiEncoding >>";
+    pages.forEach(function (st, k) {
+      objs[6 + 2 * k] = "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents " + (7 + 2 * k) + " 0 R >>";
+      objs[7 + 2 * k] = "STREAM:" + st;
+    });
+    var out = "%PDF-1.4\n";
+    var offsets = [];
+    for (var i = 1; i < objs.length; i++) {
+      offsets[i] = out.length;
+      if (objs[i].indexOf("STREAM:") === 0) {
+        var s = objs[i].slice(7);
+        out += i + " 0 obj\n<< /Length " + s.length + " >>\nstream\n" + s + "endstream\nendobj\n";
+      } else {
+        out += i + " 0 obj\n" + objs[i] + "\nendobj\n";
+      }
+    }
+    var xref = out.length;
+    out += "xref\n0 " + objs.length + "\n0000000000 65535 f \n";
+    for (var j = 1; j < objs.length; j++) {
+      out += String(offsets[j]).padStart(10, "0") + " 00000 n \n";
+    }
+    out += "trailer\n<< /Size " + objs.length + " /Root 1 0 R >>\nstartxref\n" + xref + "\n%%EOF";
+    var bytes = new Uint8Array(out.length);
+    for (var b = 0; b < out.length; b++) bytes[b] = out.charCodeAt(b) & 0xFF;
+    return bytes;
   }
   $("shareResultBtn").addEventListener("click", function () {
     var text = resultText();
@@ -947,16 +1119,16 @@
     } else toast(text);
   });
   $("saveResultBtn").addEventListener("click", function () {
-    var blob = new Blob(["\uFEFF" + resultCSV()], { type: "text/csv;charset=utf-8" });
+    var blob = new Blob([buildPDF()], { type: "application/pdf" });
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
     a.href = url;
-    a.download = "abrechnung-ergebnis.csv";
+    a.download = "abrechnung-ergebnis.pdf";
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
-    toast("CSV wird gespeichert");
+    toast("PDF wird gespeichert");
   });
   $("clearBtn").addEventListener("click", function () {
     if (!confirm("Wirklich alles löschen? Die Zuordnung und alle Transaktionen werden von diesem Gerät entfernt.")) return;
