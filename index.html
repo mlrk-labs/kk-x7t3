@@ -414,6 +414,11 @@
       <div class="total-card ich"><div class="tl">Ich</div><div class="tv" id="totIch">0,00 €</div><div class="tc" id="cntIch"></div></div>
     </div>
     <div class="stack">
+      <div class="card-panel">
+        <div class="kv"><span>Ausgaben gesamt (ohne Gutschriften)</span><span class="v" id="sGross">–</span></div>
+        <div class="kv"><span>Gutschriften</span><span class="v" id="sCredit">–</span></div>
+        <div class="kv"><span>Saldo gesamt (mit Gutschriften)</span><span class="v" id="sNet">–</span></div>
+      </div>
       <details class="plist" id="listMamaWrap">
         <summary>Positionen Mama <span id="sumMamaMini"></span></summary>
         <ul id="listMama"></ul>
@@ -457,8 +462,9 @@
 
   // ---------- utils ----------
   function euro(cents) {
-    var v = (cents / 100).toFixed(2).replace(".", ",");
-    return v.replace(/\B(?=(\d{3})+(?!\d))/g, ".") + " €";
+    var neg = cents < 0;
+    var v = (Math.abs(cents) / 100).toFixed(2).replace(".", ",");
+    return (neg ? "−" : "") + v.replace(/\B(?=(\d{3})+(?!\d))/g, ".") + " €";
   }
   function toast(msg) {
     var t = $("toast");
@@ -1023,7 +1029,7 @@
       (item.c < 0 ? '<div class="tcredit">Gutschrift</div>' : "") +
       '<div class="tnote"></div>';
     el.querySelector(".tdate").textContent = item.d;
-    el.querySelector(".tamount").textContent = euro(Math.abs(item.c)) + (item.c < 0 ? " −" : "");
+    el.querySelector(".tamount").textContent = euro(item.c);
     el.querySelector(".tdesc").textContent = item.n;
     el.querySelector(".tnote").textContent = note ? "💬 " + note : "";
     return el;
@@ -1151,6 +1157,14 @@
   // ---------- Done ----------
   function renderDone() {
     var t = totals();
+    var gross = 0, credit = 0;
+    state.items.forEach(function (it) {
+      if (it.c >= 0) gross += it.c;
+      else credit += it.c;
+    });
+    $("sGross").textContent = euro(gross);
+    $("sCredit").textContent = euro(credit);
+    $("sNet").textContent = euro(gross + credit);
     $("totIch").textContent = euro(t.ich);
     $("totMama").textContent = euro(t.mama);
     $("cntIch").textContent = t.nIch + " Positionen";
@@ -1196,9 +1210,17 @@
 
   function resultText() {
     var t = totals();
+    var gross = 0, credit = 0;
+    state.items.forEach(function (it) {
+      if (it.c >= 0) gross += it.c;
+      else credit += it.c;
+    });
     return "Ergebnis der Abrechnung „" + state.name + "“\n" +
       "Mama: " + euro(t.mama) + " (" + t.nMama + " Positionen)\n" +
-      "Ich (Vanessa): " + euro(t.ich) + " (" + t.nIch + " Positionen)";
+      "Ich (Vanessa): " + euro(t.ich) + " (" + t.nIch + " Positionen)\n" +
+      "Gesamt ohne Gutschriften: " + euro(gross) + "\n" +
+      "Gutschriften: " + euro(credit) + "\n" +
+      "Saldo gesamt: " + euro(gross + credit);
   }
   // ---------- PDF ----------
   var WIN_MAP = { 0x20AC: 0x80, 0x201E: 0x84, 0x2026: 0x85, 0x2018: 0x91, 0x2019: 0x92, 0x201C: 0x93, 0x201D: 0x94, 0x2013: 0x96, 0x2014: 0x97 };
