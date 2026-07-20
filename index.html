@@ -325,12 +325,12 @@
     <p class="sub">Private Zuordnung der Kartenabrechnung. Die Daten bleiben nur auf euren Handys.</p>
     <div class="who">
       <button id="pickMichi">
-        <span class="avatar av-m rounded">M</span>
-        <span><span class="name rounded">Michi</span><br><span class="role">Admin · Abrechnung hochladen</span></span>
+        <span class="avatar av-m rounded">⚙</span>
+        <span><span class="name rounded">Settings</span><br><span class="role">CSV hochladen · Codes erstellen</span></span>
       </button>
       <button id="pickVanessa">
-        <span class="avatar av-v rounded">V</span>
-        <span><span class="name rounded">Vanessa</span><br><span class="role">Positionen zuordnen (swipen)</span></span>
+        <span class="avatar av-v rounded">👤</span>
+        <span><span class="name rounded">User</span><br><span class="role">Positionen zuordnen (swipen)</span></span>
       </button>
     </div>
   </section>
@@ -338,7 +338,7 @@
   <!-- MICHI -->
   <section class="screen" id="scr-michi">
     <h1 class="rounded">Abrechnung hochladen</h1>
-    <p class="sub">Lade die CSV-Datei aus dem Amex-Konto hoch – auch mehrmals im Monat: Vanessa bekommt automatisch nur die neuen Positionen. Die CSV wird nur hier im Browser gelesen und nirgendwohin übertragen.</p>
+    <p class="sub">Lade die CSV-Datei aus dem Amex-Konto hoch – auch mehrmals im Monat: Beim Einfügen des Codes kommen automatisch nur die neuen Positionen dazu. Die CSV wird nur hier im Browser gelesen und nirgendwohin übertragen.</p>
     <div class="stack">
       <input class="text" id="stmtName" placeholder="Name der Abrechnung, z. B. Juni" maxlength="30">
       <label class="chkrow"><input type="checkbox" id="finalChk"> Finale Abrechnung des Monats</label>
@@ -365,7 +365,7 @@
 
       <div class="sect-label">Abrechnung beenden</div>
       <div class="card-panel stack">
-        <p class="hint" style="margin:0">Erst wenn du eine Abrechnung endgültig beendest, verschwindet sie bei Vanessa – auch wenn sie schon „geklärt“ ist. Schicke ihr dazu einen Lösch-Code.</p>
+        <p class="hint" style="margin:0">Erst ein Lösch-Code beendet eine Abrechnung endgültig – auch wenn sie schon „geklärt“ ist. Er wird dort eingefügt, wo die Abrechnung liegt.</p>
         <input class="text" id="closeName" placeholder="Name der Abrechnung, z. B. Juni" maxlength="30">
         <button class="btn secondary" id="closeCodeBtn">Lösch-Code senden</button>
       </div>
@@ -374,11 +374,11 @@
 
   <!-- VANESSA: OVERVIEW -->
   <section class="screen" id="scr-over">
-    <h1 class="rounded">Hallo Vanessa 👋</h1>
-    <p class="sub" id="noStmts">Füge den Code ein, den Michi dir geschickt hat. Danach kannst du jederzeit weiterswipen – der Stand wird auf deinem Handy gespeichert.</p>
+    <h1 class="rounded">Abrechnungen</h1>
+    <p class="sub" id="noStmts">Füge den Code ein, den du bekommen hast. Danach kannst du jederzeit weiterswipen – der Stand wird auf deinem Handy gespeichert.</p>
     <div class="stack">
       <div id="stmtList"></div>
-      <div class="sect-label">Code von Michi</div>
+      <div class="sect-label">Code einfügen</div>
       <textarea class="code" id="codeIn" placeholder="Neuen Code oder Lösch-Code hier einfügen …"></textarea>
       <button class="btn" id="loadCodeBtn">Code laden</button>
     </div>
@@ -411,7 +411,7 @@
     <p class="sub">So sieht die Aufteilung aus. Tippe auf eine Position, um sie noch der anderen Person zuzuschieben.</p>
     <div class="totals">
       <div class="total-card mama"><div class="tl">Mama</div><div class="tv" id="totMama">0,00 €</div><div class="tc" id="cntMama"></div></div>
-      <div class="total-card ich"><div class="tl">Ich</div><div class="tv" id="totIch">0,00 €</div><div class="tc" id="cntIch"></div></div>
+      <div class="total-card ich"><div class="tl" id="tlIch">Ich</div><div class="tv" id="totIch">0,00 €</div><div class="tc" id="cntIch"></div></div>
     </div>
     <div class="stack">
       <div class="card-panel">
@@ -487,6 +487,11 @@
       if (raw) db = JSON.parse(raw) || { statements: {} };
     } catch (e) {}
     if (!db.statements) db.statements = {};
+    Object.keys(db.statements).forEach(function (id) {
+      var s = db.statements[id];
+      if (!s.owner) s.owner = "Vanessa";
+      if (!s.notes) s.notes = s.items.map(function () { return ""; });
+    });
     // Migration von v1 (eine einzelne Abrechnung ohne Namen)
     try {
       var old = localStorage.getItem(LS_KEY);
@@ -524,7 +529,7 @@
     });
     $("backBtn").hidden = (name === "home" || name === "lock");
     var title = {
-      lock: "KK", home: "KK", michi: "Michi · Admin", over: "Vanessa",
+      lock: "KK", home: "KK", michi: "Settings", over: "User",
       swipe: "Zuordnen", done: "Ergebnis"
     }[name];
     if ((name === "swipe" || name === "done") && state) {
@@ -682,9 +687,9 @@
     }
     return Promise.resolve("KK0." + b64urlFromBytes(raw));
   }
-  function encodeItems(items, name, fin) {
+  function encodeItems(items, name, fin, owner) {
     var slim = items.map(function (it) { return { d: it.d, n: it.n, c: it.c }; });
-    var obj = { v: 2, name: name, items: slim };
+    var obj = { v: 2, name: name, items: slim, o: owner };
     if (fin) obj.fin = 1;
     return encodeObj(obj);
   }
@@ -708,6 +713,7 @@
       if (obj.close) return obj;
       if (!Array.isArray(obj.items) || !obj.items.length) throw new Error("empty");
       if (!obj.name) obj.name = "Abrechnung";
+      if (!obj.o) obj.o = "Vanessa";
       return obj;
     });
   }
@@ -799,9 +805,20 @@
   });
 
   function stmtNameValue() { return $("stmtName").value.trim(); }
+  function ownerFromHolder(h) {
+    if (!h) return "Vanessa";
+    var first = h.trim().split(/\s+/)[0].toLowerCase();
+    if (first === "michael") return "Michi";
+    return first.charAt(0).toUpperCase() + first.slice(1);
+  }
+  function uploadOwner() {
+    if (holderNames.length > 1) return ownerFromHolder(selectedHolder);
+    if (holderNames.length === 1) return ownerFromHolder(holderNames[0]);
+    return "Vanessa";
+  }
   function ensureCode() {
     if (currentCode) return Promise.resolve(currentCode);
-    return encodeItems(activeItems(), stmtNameValue(), $("finalChk").checked).then(function (c) {
+    return encodeItems(activeItems(), stmtNameValue(), $("finalChk").checked, uploadOwner()).then(function (c) {
       currentCode = c;
       return c;
     });
@@ -853,7 +870,7 @@
   $("swipeHereBtn").addEventListener("click", function () {
     var items = activeItems();
     if (!items.length || !requireName()) return;
-    var res = mergeStatement(stmtNameValue(), items, $("finalChk").checked);
+    var res = mergeStatement(stmtNameValue(), items, $("finalChk").checked, uploadOwner());
     setCur(res.id);
     show(openCount(state) > 0 ? "swipe" : "done");
   });
@@ -881,7 +898,7 @@
 
   // ---------- Vanessa: Übersicht & Merge ----------
   function keyOf(it) { return it.d + "|" + it.n + "|" + it.c; }
-  function mergeStatement(name, items, fin) {
+  function mergeStatement(name, items, fin, owner) {
     var id = normId(name);
     var st = db.statements[id];
     if (!st) {
@@ -889,6 +906,8 @@
       db.statements[id] = st;
     }
     if (fin) st.fin = true;
+    if (owner && !st.owner) st.owner = owner;
+    if (!st.owner) st.owner = "Vanessa";
     var counts = {};
     st.items.forEach(function (it) {
       var k = keyOf(it);
@@ -965,7 +984,7 @@
       b.querySelector(".s-status").textContent = open > 0
         ? open + " von " + s.items.length + " noch offen"
         : (s.cleared ? "Geklärt ✓ – wartet auf Michis Lösch-Code" : "Alles zugeordnet – noch nicht geklärt");
-      b.querySelector(".s-sums").textContent = "Mama " + euro(t.mama) + " · Ich " + euro(t.ich);
+      b.querySelector(".s-sums").textContent = "Mama " + euro(t.mama) + " · " + (s.owner || "Ich") + " " + euro(t.ich);
       b.addEventListener("click", function () {
         setCur(id);
         show(open > 0 ? "swipe" : "done");
@@ -991,7 +1010,7 @@
         toast("Abrechnung beendet und gelöscht ✓");
         return;
       }
-      var res = mergeStatement(obj.name, obj.items, obj.fin);
+      var res = mergeStatement(obj.name, obj.items, obj.fin, obj.o);
       var msg = "„" + obj.name + "“" + (obj.fin ? " (final)" : "") + ": " + res.added + " neue Positionen";
       if (res.moved) msg += " · " + res.moved + " aus anderer Abrechnung übernommen";
       if (!res.added && !res.moved) msg = "„" + obj.name + "“: keine neuen Positionen";
@@ -1165,6 +1184,8 @@
     $("sGross").textContent = euro(gross);
     $("sCredit").textContent = euro(credit);
     $("sNet").textContent = euro(gross + credit);
+    $("tlIch").textContent = state.owner || "Ich";
+    $("pdfIchBtn").textContent = "PDF " + (state.owner || "Vanessa");
     $("totIch").textContent = euro(t.ich);
     $("totMama").textContent = euro(t.mama);
     $("cntIch").textContent = t.nIch + " Positionen";
@@ -1217,7 +1238,7 @@
     });
     return "Ergebnis der Abrechnung „" + state.name + "“\n" +
       "Mama: " + euro(t.mama) + " (" + t.nMama + " Positionen)\n" +
-      "Ich (Vanessa): " + euro(t.ich) + " (" + t.nIch + " Positionen)\n" +
+      (state.owner || "Vanessa") + ": " + euro(t.ich) + " (" + t.nIch + " Positionen)\n" +
       "Gesamt ohne Gutschriften: " + euro(gross) + "\n" +
       "Gutschriften: " + euro(credit) + "\n" +
       "Saldo gesamt: " + euro(gross + credit);
@@ -1240,7 +1261,7 @@
     return "BT /" + font + " " + size + " Tf " + x + " " + y + " Td (" + pdfEsc(txt) + ") Tj ET\n";
   }
   function buildPDF(who) {
-    var personName = who === "ich" ? "Vanessa" : "Mama";
+    var personName = who === "ich" ? (state.owner || "Vanessa") : "Mama";
     var rows = [];
     state.decisions.forEach(function (d, i) {
       var it = state.items[i];
@@ -1340,7 +1361,7 @@
     } else toast(text);
   });
   function downloadPDF(who) {
-    var personName = who === "ich" ? "vanessa" : "mama";
+    var personName = who === "ich" ? (state.owner || "Vanessa").toLowerCase() : "mama";
     var blob = new Blob([buildPDF(who)], { type: "application/pdf" });
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
