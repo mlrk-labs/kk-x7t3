@@ -305,6 +305,7 @@
   }
   .plist li .mv.ich { color: var(--ich); border-color: var(--ich); background: var(--ich-soft); }
   .plist li .mv.mama { color: var(--mama); border-color: var(--mama); background: var(--mama-soft); }
+  .plist li .mv.sp { color: var(--ink); border-color: var(--line); background: var(--surface-2); }
 </style>
 </head>
 <body>
@@ -432,17 +433,17 @@
       <details class="plist" id="listMamaWrap">
         <summary>Positionen Mama <span id="sumMamaMini"></span></summary>
         <ul id="listMama"></ul>
-        <div class="moveHint">Tippen = zu „Ich“ verschieben</div>
+        <div class="moveHint">Tippen = zu „Ich“ verschieben · ⑂ aufteilen · 💬 Kommentar</div>
       </details>
       <details class="plist" id="listIchWrap">
         <summary>Positionen Ich <span id="sumIchMini"></span></summary>
         <ul id="listIch"></ul>
-        <div class="moveHint">Tippen = zu „Mama“ verschieben</div>
+        <div class="moveHint">Tippen = zu „Mama“ verschieben · ⑂ aufteilen · 💬 Kommentar</div>
       </details>
       <details class="plist" id="listSkipWrap" hidden>
         <summary>Übersprungen <span id="sumSkipMini"></span></summary>
         <ul id="listSkip"></ul>
-        <div class="moveHint">Zählt in keiner Summe mit – mit den Knöpfen einer Person zuordnen</div>
+        <div class="moveHint">Zählt in keiner Summe mit – per Knopf einer Person zuordnen oder mit ⑂ aufteilen</div>
       </details>
       <button class="btn" id="shareResultBtn">Ergebnis senden</button>
       <div class="pdfrow">
@@ -1288,7 +1289,8 @@
         var li = document.createElement("li");
         li.innerHTML =
           '<div class="row"><span class="d"></span><span class="n"></span>' +
-          '<span class="a"></span><span class="nb" role="button" aria-label="Kommentar">💬</span></div>' +
+          '<span class="a"></span><span class="nb sp" role="button" aria-label="Aufteilen">⑂</span>' +
+          '<span class="nb" role="button" aria-label="Kommentar">💬</span></div>' +
           '<div class="note"></div>';
         li.querySelector(".d").textContent = it.d;
         li.querySelector(".n").textContent = it.n + (isSplit ? " (Anteil)" : "");
@@ -1296,7 +1298,11 @@
         var note = noteAt(i);
         li.querySelector(".note").textContent = note;
         li.querySelector(".note").hidden = !note;
-        li.querySelector(".nb").addEventListener("click", function (e) {
+        li.querySelector(".nb.sp").addEventListener("click", function (e) {
+          e.stopPropagation();
+          splitItem(i, renderDone);
+        });
+        li.querySelector(".nb:not(.sp)").addEventListener("click", function (e) {
           e.stopPropagation();
           editNote(i, renderDone);
         });
@@ -1318,6 +1324,7 @@
       li.style.cursor = "default";
       li.innerHTML =
         '<div class="row"><span class="d"></span><span class="n"></span><span class="a"></span>' +
+        '<button class="mv sp" type="button" aria-label="Aufteilen">⑂</button>' +
         '<button class="mv mama" type="button">Mama</button><button class="mv ich" type="button">Ich</button></div>' +
         '<div class="note"></div>';
       li.querySelector(".d").textContent = it.d;
@@ -1326,6 +1333,9 @@
       var note = noteAt(i);
       li.querySelector(".note").textContent = note;
       li.querySelector(".note").hidden = !note;
+      li.querySelector(".mv.sp").addEventListener("click", function () {
+        splitItem(i, renderDone);
+      });
       li.querySelector(".mv.mama").addEventListener("click", function () {
         state.decisions[i] = "mama";
         save();
