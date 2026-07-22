@@ -9,11 +9,11 @@
 <meta name="theme-color" content="#101315" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="KK">
+<meta name="apple-mobile-web-app-title" content="CC Coordinator">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="icon-180.png">
-<link rel="icon" href="icon-192.png">
-<title>KK</title>
+<link rel="apple-touch-icon" href="icon-180.png?v=2">
+<link rel="icon" href="icon-192.png?v=2">
+<title>CC Coordinator</title>
 <style>
   :root {
     --bg: #F5F4EF;
@@ -313,7 +313,7 @@
 <div class="app">
   <header class="bar">
     <button class="backbtn" id="backBtn" hidden>‹ Zurück</button>
-    <div class="title rounded" id="barTitle">KK</div>
+    <div class="title rounded" id="barTitle">CC Coordinator</div>
     <div class="spacer"></div>
   </header>
 
@@ -389,6 +389,7 @@
       <div class="sect-label">Code einfügen</div>
       <textarea class="code" id="codeIn" placeholder="Neuen Code oder Lösch-Code hier einfügen …"></textarea>
       <button class="btn" id="loadCodeBtn">Code laden</button>
+      <button class="btn ghost" id="backupBtn">Backup-Code erstellen (alle Abrechnungen inkl. Zuordnungen)</button>
     </div>
   </section>
 
@@ -551,7 +552,7 @@
     });
     $("backBtn").hidden = (name === "home" || name === "lock");
     var title = {
-      lock: "KK", home: "KK", michi: "Settings", over: "User",
+      lock: "CC Coordinator", home: "CC Coordinator", michi: "Settings", over: "User",
       swipe: "Zuordnen", done: "Ergebnis"
     }[name];
     if ((name === "swipe" || name === "done") && state) {
@@ -734,6 +735,7 @@
       var obj = JSON.parse(json);
       if (!obj) throw new Error("empty");
       if (obj.close) return obj;
+      if (obj.bk && typeof obj.bk === "object") return obj;
       if (!Array.isArray(obj.items) || !obj.items.length) throw new Error("empty");
       if (!obj.name) obj.name = "Abrechnung";
       if (!obj.o) obj.o = "Vanessa";
@@ -1039,6 +1041,22 @@
     if (!code.trim()) { toast("Bitte zuerst den Code einfügen"); return; }
     decodeObj(code).then(function (obj) {
       $("codeIn").value = "";
+      if (obj.bk) {
+        var ids = Object.keys(obj.bk);
+        if (!ids.length) { toast("Backup ist leer"); return; }
+        if (!confirm("Backup mit " + ids.length + " Abrechnung(en) wiederherstellen? Gleichnamige Abrechnungen auf diesem Gerät werden ersetzt.")) return;
+        ids.forEach(function (id) {
+          var s = obj.bk[id];
+          if (!s || !s.items) return;
+          if (!s.owner) s.owner = "Vanessa";
+          if (!s.notes) s.notes = s.items.map(function () { return ""; });
+          db.statements[id] = s;
+        });
+        save();
+        renderOverview();
+        toast("Backup wiederhergestellt: " + ids.length + " Abrechnung(en) ✓");
+        return;
+      }
       if (obj.close) {
         var id = normId(obj.close);
         if (!db.statements[id]) {
@@ -1065,6 +1083,27 @@
       }
     }).catch(function () {
       toast("Code ungültig – bitte komplett kopieren und erneut einfügen");
+    });
+  });
+  $("backupBtn").addEventListener("click", function () {
+    if (!Object.keys(db.statements).length) {
+      toast("Keine Abrechnungen zum Sichern vorhanden");
+      return;
+    }
+    encodeObj({ v: 2, bk: db.statements }).then(function (code) {
+      var text = "CC Coordinator Backup-Code (alle Abrechnungen inkl. Zuordnungen):\n\n" + code;
+      if (navigator.share) {
+        navigator.share({ text: text }).catch(function () {});
+      } else if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(
+          function () { toast("Backup-Code kopiert"); },
+          function () { $("codeIn").value = code; $("codeIn").select(); toast("Backup-Code eingefügt – manuell kopieren"); }
+        );
+      } else {
+        $("codeIn").value = code;
+        $("codeIn").select();
+        toast("Backup-Code eingefügt – manuell kopieren");
+      }
     });
   });
 
