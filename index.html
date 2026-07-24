@@ -1264,6 +1264,23 @@
   });
 
   // ---------- Done ----------
+  function dateKey(d) {
+    var m = String(d).match(/(\d{1,2})[./](\d{1,2})[./](\d{2,4})/);
+    if (m) {
+      var y = m[3].length === 2 ? "20" + m[3] : m[3];
+      return parseInt(y + ("0" + m[2]).slice(-2) + ("0" + m[1]).slice(-2), 10);
+    }
+    m = String(d).match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (m) return parseInt(m[1] + ("0" + m[2]).slice(-2) + ("0" + m[3]).slice(-2), 10);
+    return 0;
+  }
+  function sortedIdx() {
+    var idx = state.items.map(function (_, i) { return i; });
+    idx.sort(function (a, b) {
+      return dateKey(state.items[a].d) - dateKey(state.items[b].d) || a - b;
+    });
+    return idx;
+  }
   function renderDone() {
     var t = totals();
     var gross = 0, credit = 0, skipSum = 0, skipCount = 0;
@@ -1317,7 +1334,8 @@
     ["ich", "mama"].forEach(function (who) {
       var ul = $(who === "ich" ? "listIch" : "listMama");
       ul.innerHTML = "";
-      state.decisions.forEach(function (d, i) {
+      sortedIdx().forEach(function (i) {
+        var d = state.decisions[i];
         var isSplit = d && d.s;
         var part = null;
         if (isSplit) {
@@ -1356,7 +1374,8 @@
     });
     var skUl = $("listSkip");
     skUl.innerHTML = "";
-    state.decisions.forEach(function (d, i) {
+    sortedIdx().forEach(function (i) {
+      var d = state.decisions[i];
       if (d !== "skip") return;
       var it = state.items[i];
       var li = document.createElement("li");
@@ -1426,7 +1445,8 @@
   function buildPDF(who) {
     var personName = who === "ich" ? (state.owner || "Vanessa") : "Mama";
     var rows = [];
-    state.decisions.forEach(function (d, i) {
+    sortedIdx().forEach(function (i) {
+      var d = state.decisions[i];
       var it = state.items[i];
       var note = noteAt(i);
       function amt(c) { return (c / 100).toFixed(2).replace(".", ",") + " €"; }
@@ -1485,8 +1505,8 @@
       y -= size + 4;
     }
     var skipRows = [], skipSum = 0;
-    state.decisions.forEach(function (d, i) {
-      if (d !== "skip") return;
+    sortedIdx().forEach(function (i) {
+      if (state.decisions[i] !== "skip") return;
       skipSum += state.items[i].c;
       skipRows.push(state.items[i]);
     });
